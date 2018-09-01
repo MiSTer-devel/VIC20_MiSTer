@@ -129,7 +129,7 @@ parameter CONF_STR = {
 	"OB,Cart is writable,No,Yes;", 
 	"R0,Reset;",
 	"J,Fire;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v1.10.",`BUILD_DATE
 };
 
 wire      extram1 = status[6];
@@ -346,11 +346,10 @@ VIC20 VIC20
 
 	//IEC
 	.atn_o(v20_iec_atn_o),
-	.atn_i(!v20_iec_atn_i),
 	.clk_o(v20_iec_clk_o),
-	.clk_i(!v20_iec_clk_i),
 	.data_o(v20_iec_data_o),
-	.data_i(!v20_iec_data_i),
+	.clk_i(c1541_iec_clk_o),
+	.data_i(c1541_iec_data_o),
 
 	.i_joy(~{joy[0],joy[1],joy[2],joy[3]}),
 	.i_fire(~joy[4]),
@@ -381,28 +380,6 @@ VIC20 VIC20
 wire v20_iec_atn_o;
 wire v20_iec_data_o;
 wire v20_iec_clk_o;
-
-reg v20_iec_atn_i;
-reg v20_iec_data_i; 
-reg v20_iec_clk_i;
-
-always @(posedge clk_v20) begin
-	reg iec_atn_d1,iec_atn_d2;
-	reg iec_data_d1,iec_data_d2;
-	reg iec_clk_d1,iec_clk_d2;
-
-	iec_atn_d1 <=iec_atn_i;
-	iec_data_d1<=iec_data_i;
-	iec_clk_d1 <=iec_clk_i;
-	
-	iec_atn_d2 <=iec_atn_d1;
-	iec_data_d2<=iec_data_d1;
-	iec_clk_d2 <=iec_clk_d1;
-
-	v20_iec_atn_i <=iec_atn_d2;
-	v20_iec_data_i<=iec_data_d2;
-	v20_iec_clk_i <=iec_clk_d2;
-end
 
 wire [15:0] audio;
 
@@ -454,40 +431,12 @@ video_mixer #(256, 1) mixer
 
 wire led_disk;
 
-wire c1541_iec_atn_o;
 wire c1541_iec_data_o;
 wire c1541_iec_clk_o;
-
-wire iec_atn_i  = v20_iec_atn_o  | c1541_iec_atn_o;
-wire iec_data_i = v20_iec_data_o | c1541_iec_data_o;
-wire iec_clk_i  = v20_iec_clk_o  | c1541_iec_clk_o;
-
-reg c1541_iec_atn_i;
-reg c1541_iec_data_i; 
-reg c1541_iec_clk_i;
-
-always @(posedge clk_sys) begin
-	reg iec_atn_d1,iec_atn_d2;
-	reg iec_data_d1,iec_data_d2; 
-	reg iec_clk_d1,iec_clk_d2;
-
-	iec_atn_d1 <=iec_atn_i;
-	iec_data_d1<=iec_data_i;
-	iec_clk_d1 <=iec_clk_i;
-	
-	iec_atn_d2 <=iec_atn_d1;
-	iec_data_d2<=iec_data_d1;
-	iec_clk_d2 <=iec_clk_d1;
-
-	c1541_iec_atn_i <=iec_atn_d2;
-	c1541_iec_data_i<=iec_data_d2; 
-	c1541_iec_clk_i <=iec_clk_d2;
-end
 
 c1541_sd c1541_sd
 (
 	.clk32 (clk_sys),
-	.reset (reset),
 
 	.c1541rom_clk(clk_sys),
 	.c1541rom_addr(ioctl_addr[13:0]),
@@ -497,11 +446,10 @@ c1541_sd c1541_sd
    .disk_change ( img_mounted ),
 	.disk_readonly ( img_readonly ),
 
-	.iec_atn_i  ( c1541_iec_atn_i  ),
-	.iec_data_i ( c1541_iec_data_i ),
-	.iec_clk_i  ( c1541_iec_clk_i  ),
-
-	.iec_atn_o  ( c1541_iec_atn_o  ),
+	.iec_reset_i( reset          ),
+	.iec_atn_i  ( v20_iec_atn_o  ),
+	.iec_data_i ( v20_iec_data_o ),
+	.iec_clk_i  ( v20_iec_clk_o  ),
 	.iec_data_o ( c1541_iec_data_o ),
 	.iec_clk_o  ( c1541_iec_clk_o  ),
 
@@ -511,7 +459,6 @@ c1541_sd c1541_sd
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
-
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),

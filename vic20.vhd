@@ -59,7 +59,6 @@ entity VIC20 is
     i_reset               : in  std_logic;
     -- serial bus pins
     atn_o                 : out std_logic; -- open drain
-    atn_i                 : in  std_logic;
     clk_o                 : out std_logic; -- open drain
     clk_i                 : in  std_logic;
     data_o                : out std_logic; -- open drain
@@ -98,122 +97,142 @@ end;
 
 architecture RTL of VIC20 is
 
-    -- default
-    constant K_OFFSET : std_logic_vector (4 downto 0) := "10000"; -- h position of screen to centre on your telly
-    -- lunar lander is WAY off to the left
-    --constant K_OFFSET : std_logic_vector (4 downto 0) := "11100"; -- h position of screen to centre on your telly
+-- default
+constant K_OFFSET : std_logic_vector (4 downto 0) := "10000"; -- h position of screen to centre on your telly
+-- lunar lander is WAY off to the left
+--constant K_OFFSET : std_logic_vector (4 downto 0) := "11100"; -- h position of screen to centre on your telly
 
-    signal reset_l            : std_logic;
-    signal ena_4              : std_logic;
-    signal reset_l_sampled    : std_logic;
-    -- cpu
-    signal c_ena              : std_logic;
-    signal c_addr             : std_logic_vector(23 downto 0);
-    signal c_din              : std_logic_vector(7 downto 0);
-    signal c_dout             : std_logic_vector(7 downto 0);
-    signal c_rw_l             : std_logic;
-    signal c_irq_l            : std_logic;
-    signal c_nmi_l            : std_logic;
-    --
-    signal io_sel_l           : std_logic_vector(3 downto 0);
-    signal blk_sel_l          : std_logic_vector(7 downto 0);
-    signal ram_sel_l          : std_logic_vector(7 downto 0);
+signal reset_l            : std_logic;
+signal ena_4              : std_logic;
+signal reset_l_sampled    : std_logic;
+-- cpu
+signal c_ena              : std_logic;
+signal c_addr             : std_logic_vector(23 downto 0);
+signal c_din              : std_logic_vector(7 downto 0);
+signal c_dout             : std_logic_vector(7 downto 0);
+signal c_rw_l             : std_logic;
+signal c_irq_l            : std_logic;
+signal c_nmi_l            : std_logic;
+--
+signal io_sel_l           : std_logic_vector(3 downto 0);
+signal blk_sel_l          : std_logic_vector(7 downto 0);
+signal ram_sel_l          : std_logic_vector(7 downto 0);
 
-    -- vic
-    signal vic_addr           : std_logic_vector(13 downto 0);
-    signal vic_oe_l           : std_logic;
-    signal vic_dout           : std_logic_vector( 7 downto 0);
-    signal vic_din            : std_logic_vector(11 downto 0);
-    signal p2_h               : std_logic;
-    signal ena_1mhz           : std_logic;
-    signal via1_dout          : std_logic_vector( 7 downto 0);
-    signal via2_dout          : std_logic_vector( 7 downto 0);
+-- vic
+signal vic_addr           : std_logic_vector(13 downto 0);
+signal vic_oe_l           : std_logic;
+signal vic_dout           : std_logic_vector( 7 downto 0);
+signal vic_din            : std_logic_vector(11 downto 0);
+signal p2_h               : std_logic;
+signal ena_1mhz           : std_logic;
+signal via1_dout          : std_logic_vector( 7 downto 0);
+signal via2_dout          : std_logic_vector( 7 downto 0);
 
-    signal vic_audio          : std_logic_vector( 5 downto 0);
-    signal lp_output          : std_logic_vector(15 downto 0);
-    signal lp_filtered        : std_logic_vector(15 downto 0);
+signal vic_audio          : std_logic_vector( 5 downto 0);
+signal lp_output          : std_logic_vector(15 downto 0);
+signal lp_filtered        : std_logic_vector(15 downto 0);
 
-    -- video system
-    signal v_addr             : std_logic_vector(13 downto 0);
-    signal v_data             : std_logic_vector( 7 downto 0);
-    signal v_data_oe_l        : std_logic;
-    signal v_data_read_mux    : std_logic_vector( 7 downto 0);
-    signal v_data_read_muxr   : std_logic_vector( 7 downto 0);
-    signal v_rw_l             : std_logic;
-    signal col_ram_sel_l      : std_logic;
+-- video system
+signal v_addr             : std_logic_vector(13 downto 0);
+signal v_data             : std_logic_vector( 7 downto 0);
+signal v_data_oe_l        : std_logic;
+signal v_data_read_mux    : std_logic_vector( 7 downto 0);
+signal v_data_read_muxr   : std_logic_vector( 7 downto 0);
+signal v_rw_l             : std_logic;
+signal col_ram_sel_l      : std_logic;
 
-    -- ram
-    signal ram0_dout          : std_logic_vector(7 downto 0);
-    signal ram45_dout         : std_logic_vector(7 downto 0);
-    signal ram67_dout         : std_logic_vector(7 downto 0);
-	 signal ramex0_dout        : std_logic_vector(7 downto 0);
-	 signal ramex1_dout        : std_logic_vector(7 downto 0);
-	 signal ramex2_dout        : std_logic_vector(7 downto 0);
-	 signal ramex3_dout        : std_logic_vector(7 downto 0);
-	 signal cart_dout          : std_logic_vector(7 downto 0);
-    --
-    signal col_ram_dout       : std_logic_vector(3 downto 0);
+-- ram
+signal ram0_dout          : std_logic_vector(7 downto 0);
+signal ram45_dout         : std_logic_vector(7 downto 0);
+signal ram67_dout         : std_logic_vector(7 downto 0);
+signal ramex0_dout        : std_logic_vector(7 downto 0);
+signal ramex1_dout        : std_logic_vector(7 downto 0);
+signal ramex2_dout        : std_logic_vector(7 downto 0);
+signal ramex3_dout        : std_logic_vector(7 downto 0);
+signal cart_dout          : std_logic_vector(7 downto 0);
+--
+signal col_ram_dout       : std_logic_vector(3 downto 0);
 
-    -- rom
-    signal char_rom_dout      : std_logic_vector(7 downto 0);
-    signal basic_rom_dout     : std_logic_vector(7 downto 0);
-    signal kernal_rom_dout    : std_logic_vector(7 downto 0);
+-- rom
+signal char_rom_dout      : std_logic_vector(7 downto 0);
+signal basic_rom_dout     : std_logic_vector(7 downto 0);
+signal kernal_rom_dout    : std_logic_vector(7 downto 0);
 
-    -- expansion
-    signal expansion_din      : std_logic_vector(7 downto 0);
-    signal expansion_nmi_l    : std_logic;
-    signal expansion_irq_l    : std_logic;
+-- expansion
+signal expansion_din      : std_logic_vector(7 downto 0);
+signal expansion_nmi_l    : std_logic;
+signal expansion_irq_l    : std_logic;
 
-    -- VIAs
-    signal via1_nmi_l         : std_logic;
-    signal via1_pa_in         : std_logic_vector(7 downto 0);
-    signal via1_pa_out        : std_logic_vector(7 downto 0);
+-- VIAs
+signal via1_nmi_l         : std_logic;
+signal via1_pa_in         : std_logic_vector(7 downto 0);
+signal via1_pa_out        : std_logic_vector(7 downto 0);
 
-    signal via2_irq_l         : std_logic;
+signal via2_irq_l         : std_logic;
 
-    signal cass_write         : std_logic;
-    signal cass_read          : std_logic;
-    signal cass_motor         : std_logic;
-    signal cass_sw            : std_logic;
+signal cass_write         : std_logic;
+signal cass_read          : std_logic;
+signal cass_motor         : std_logic;
+signal cass_sw            : std_logic;
 
-    signal keybd_col_out      : std_logic_vector(7 downto 0);
-    signal keybd_col_out_oe_l : std_logic_vector(7 downto 0);
-    signal keybd_col_out_s    : std_logic_vector(7 downto 0);
-    signal keybd_col_in       : std_logic_vector(7 downto 0);
-    signal keybd_row_in       : std_logic_vector(7 downto 0);
-    signal keybd_row_out      : std_logic_vector(7 downto 0);
-    signal keybd_row_out_oe_l : std_logic_vector(7 downto 0);
-    signal keybd_row_out_s    : std_logic_vector(7 downto 0);
-    signal keybd_restore      : std_logic;
+signal keybd_col_out      : std_logic_vector(7 downto 0);
+signal keybd_col_out_oe_l : std_logic_vector(7 downto 0);
+signal keybd_col_out_s    : std_logic_vector(7 downto 0);
+signal keybd_col_in       : std_logic_vector(7 downto 0);
+signal keybd_row_in       : std_logic_vector(7 downto 0);
+signal keybd_row_out      : std_logic_vector(7 downto 0);
+signal keybd_row_out_oe_l : std_logic_vector(7 downto 0);
+signal keybd_row_out_s    : std_logic_vector(7 downto 0);
+signal keybd_restore      : std_logic;
 
-    signal joy                : std_logic_vector(3 downto 0);
-    signal light_pen          : std_logic;
+signal joy                : std_logic_vector(3 downto 0);
+signal light_pen          : std_logic;
 
-    signal serial_srq_in      : std_logic;
-    signal serial_atn_out_l   : std_logic;
-    signal serial_atn_in      : std_logic; -- the vic does not listen to atn_in
-    signal serial_clk_out_l   : std_logic;
-    signal serial_clk_in      : std_logic;
-    signal serial_data_out_l  : std_logic;
-    signal serial_data_in     : std_logic;
+signal serial_srq_in      : std_logic;
+signal serial_atn_out_l   : std_logic;
+signal serial_atn_in      : std_logic; -- the vic does not listen to atn_in
+signal serial_clk_out_l   : std_logic;
+signal serial_clk_in      : std_logic;
+signal serial_data_out_l  : std_logic;
+signal serial_data_in     : std_logic;
 
-    -- user port
-    signal user_port_cb1_in   : std_logic;
-    signal user_port_cb2_in   : std_logic;
-    signal user_port_in       : std_logic_vector(7 downto 0);
-    -- misc
-    signal sw_reg             : std_logic_vector(3 downto 0);
+-- user port
+signal user_port_cb1_in   : std_logic;
+signal user_port_cb2_in   : std_logic;
+signal user_port_in       : std_logic_vector(7 downto 0);
+-- misc
+signal sw_reg             : std_logic_vector(3 downto 0);
 
-    signal video_r            : std_logic_vector(3 downto 0);
-    signal video_g            : std_logic_vector(3 downto 0);
-    signal video_b            : std_logic_vector(3 downto 0);
-    signal hsync              : std_logic;
-    signal vsync              : std_logic;
+signal video_r            : std_logic_vector(3 downto 0);
+signal video_g            : std_logic_vector(3 downto 0);
+signal video_b            : std_logic_vector(3 downto 0);
+signal hsync              : std_logic;
+signal vsync              : std_logic;
 
-    signal reset_key          : std_logic;
-	 signal reset              : std_logic;
+signal reset_key          : std_logic;
+signal reset              : std_logic;
+
+signal iec_data_d1    : std_logic;
+signal iec_clk_d1     : std_logic;
+signal iec_data_d2    : std_logic;
+signal iec_clk_d2     : std_logic;
+signal iec_data       : std_logic;
+signal iec_clk        : std_logic;
 
 begin
+
+	process (i_sysclk) begin
+		if rising_edge(i_sysclk) then
+			iec_data_d1<=data_i;
+			iec_data_d2<=iec_data_d1;
+			iec_data   <=iec_data_d2;
+
+			iec_clk_d1 <=clk_i;
+			iec_clk_d2 <=iec_clk_d1;
+			iec_clk    <=iec_clk_d2;
+		end if;
+	end process;
+
   o_ce_pix <= ena_4;
   -- <= c_rw_l;
   -- <= v_rw_l;
@@ -238,9 +257,9 @@ begin
 
   -- serial
   serial_srq_in <= '1';
-  serial_clk_in <= clk_i;
-  serial_data_in <= data_i;
-  serial_atn_in <= atn_i;
+  serial_clk_in <= not (serial_clk_out_l or iec_clk);
+  serial_data_in <= not (serial_data_out_l or iec_data);
+  serial_atn_in <= not serial_atn_out_l;
   atn_o <= serial_atn_out_l;
   clk_o <= serial_clk_out_l;
   data_o <= serial_data_out_l;
