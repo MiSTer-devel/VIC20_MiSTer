@@ -14,13 +14,10 @@ You can find many dumps of multipart carts as a single CRT files - in most cases
 
 I've set following extension convention:
 - .CRT - extension for cartridges with header.
-- .CR4, .CR6, .CRA, .CRB - extensions for cartridges without header
-   with most common loading addresses $4000, $6000, $A000, $B000 respectively.
-   If you find the headerless cartridge with other loading address,  then  you
-   need to add 2 bytes at the begining with loading address in some HEX editor
-   and effectively convert it into .CRT
+- .CTx - extensions for cartridges without header
+   where x is one of 2-9,A,B(CT2-CT9,CTA,CTB) symbols denoting the loading address 2000-9000,A000,B000
 
-You won't find the cartridges with CR4/CR6/CRA/CRB extensions. All cartridges you will find will have CRT extension regardless having the header or not. So you need to rename them accordingly if they have no header!
+You won't find the cartridges with CTx extensions. All cartridges you will find will have CRT extension regardless having the header or not. So you need to rename them accordingly if they have no header!
 
 The best practice is to use only carts with header!
 

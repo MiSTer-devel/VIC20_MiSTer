@@ -116,7 +116,7 @@ parameter CONF_STR = {
 	"-;",
 	"F,PRG;",
 	"F,CRT,Load Cart;",
-	"F,CR4CR6CRACRB,Load Cart;",
+	"F,CT?,Load Cart;",
 	"S,D64;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
@@ -180,6 +180,7 @@ wire  [7:0] ioctl_index;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+wire [31:0] ioctl_file_ext;
 wire        forced_scandoubler;
 
 wire [31:0] sd_lba;
@@ -211,6 +212,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
+	.ioctl_file_ext(ioctl_file_ext),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -291,22 +293,8 @@ always @(posedge clk_sys) begin
 
 	if(ioctl_download && (ioctl_index[4:1] == 1)) begin
 		if(ioctl_wr) begin
-			if(ioctl_addr == 0 && ioctl_index == 2) begin
-				addr[7:0]  <= ioctl_dout;
-			end
-			else if(ioctl_addr == 1 && ioctl_index == 2) begin
-				addr[15:8] <= ioctl_dout;
-			end
-			else if(ioctl_addr == 0 && ioctl_index[4:0] == 3) begin
-				case(ioctl_index[7:6])
-					0: {dl_addr,addr} <= {16'h4000,16'h4001};
-					1: {dl_addr,addr} <= {16'h6000,16'h6001};
-					2: {dl_addr,addr} <= {16'hA000,16'hA001};
-					3: {dl_addr,addr} <= {16'hB000,16'hB001};
-				endcase
-				dl_data <= ioctl_dout;
-				dl_wr   <= 1;
-			end
+				  if(ioctl_addr == 0 && ioctl_index == 2) addr[7:0]  <= ioctl_dout;
+			else if(ioctl_addr == 1 && ioctl_index == 2) addr[15:8] <= ioctl_dout;
 			else if(addr < 'hC000) begin
 				if(addr[15:13] == 3'b000) cart_blk[0] <= 1;
 				if(addr[15:13] == 3'b001) cart_blk[1] <= 1;
@@ -323,6 +311,11 @@ always @(posedge clk_sys) begin
 
 	if(old_download && ~ioctl_download && (ioctl_index[4:0] == 2)) cart_reset <= 0;
 	if(sys_reset) {cart_reset, cart_blk} <= 0;
+
+	if(~old_download & ioctl_download & (ioctl_index[4:0] == 3)) begin
+		if(ioctl_file_ext[7:0] >= "2" && ioctl_file_ext[7:0] <= "9") addr <= {ioctl_file_ext[3:0],     12'h000};
+		if(ioctl_file_ext[7:0] >= "A" && ioctl_file_ext[7:0] <= "B") addr <= {ioctl_file_ext[3:0]+4'd9,12'h000};
+	end
 end
 
 
