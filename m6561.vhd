@@ -528,7 +528,7 @@ begin
         else
           v_end := (v_char_cnt(9 downto 0) = (r_num_rows(5 downto 0) & "0000"));
         end if;
-        if v_end or (vblank = '1') then
+        if v_end or (vcnt = TOTAL_LINES_M1) then
           v_char_cnt <= (others => '0');
         else
           if start_h then
