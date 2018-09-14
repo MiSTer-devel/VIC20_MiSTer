@@ -460,7 +460,7 @@ begin
           last_matrix_cnt(13 downto 9) <= r_screen_mem;
           last_matrix_cnt( 8 downto 0) <= (others => '0'); -- top left;
         elsif (h_char_last = '1') and v_char_last then
-          last_matrix_cnt <= matrix_cnt;
+          last_matrix_cnt <= last_matrix_cnt + r_num_cols;
         end if;
         if (hsync = '1') then
           matrix_cnt <= last_matrix_cnt;
