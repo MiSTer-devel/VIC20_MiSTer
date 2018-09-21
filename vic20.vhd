@@ -253,7 +253,7 @@ begin
   cass_read <= '0';
   --<= cass_write;
   --<= cass_motor
-  cass_sw <= '0'; --'1'; -- motor off
+  cass_sw <= '1'; -- sense casette buttons
 
   -- serial
   serial_srq_in <= '1';
