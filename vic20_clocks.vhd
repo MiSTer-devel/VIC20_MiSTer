@@ -52,19 +52,19 @@ library ieee;
 
 entity VIC20_CLOCKS is
   port (
-    I_SYSCLK          : in    std_logic;
-    I_SYSCLK_EN       : in    std_logic;
-    I_RESET_L         : in    std_logic;
+    I_SYSCLK          : in  std_logic;
+    I_SYSCLK_EN       : in  std_logic;
+    I_RESET_L         : in  std_logic;
     --
-    O_ENA             : out   std_logic;
-    O_RESET_L         : out   std_logic
+    O_ENA             : out std_logic;
+    O_RESET_L         : out std_logic
     );
 end;
 
 architecture RTL of VIC20_CLOCKS is
 
-  signal delay_count            : unsigned(11 downto 0) := (others => '0');
-  signal div_cnt                : unsigned(1 downto 0) := (others => '0');
+  signal delay_count : unsigned(11 downto 0) := (others => '0');
+  signal div_cnt     : std_logic;
 
 begin
   p_delay : process(I_RESET_L, I_SYSCLK)
@@ -87,11 +87,11 @@ begin
   p_clk_div : process(I_SYSCLK)
   begin
     if rising_edge(I_SYSCLK) then
-      if (I_SYSCLK_EN='1') then
-        div_cnt <= div_cnt + "1";
-        O_ENA    <= div_cnt(0) and I_SYSCLK_EN;
+      O_ENA <= '0';
+      if I_SYSCLK_EN='1' then
+        div_cnt <= not div_cnt;
+        O_ENA   <= div_cnt;
       else
-        O_ENA    <= '0';
       end if;
     end if;
   end process;

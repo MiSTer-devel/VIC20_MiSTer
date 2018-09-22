@@ -376,7 +376,7 @@ wire v20_iec_clk_o;
 
 wire [15:0] audio;
 
-assign AUDIO_L = audio;
+assign AUDIO_L = audio[15:1];
 assign AUDIO_R = AUDIO_L;
 assign AUDIO_MIX = 0;
 assign AUDIO_S = 0;
