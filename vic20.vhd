@@ -54,41 +54,42 @@ library ieee ;
 entity VIC20 is
   port (
     --
-    i_sysclk              : in  std_logic;  -- comes from CLK_A via DCM (divided by 4)
-    i_sysclk_en           : in  std_logic;  -- 8.867236 MHz enable signal
-    i_reset               : in  std_logic;
+    i_sysclk     : in  std_logic;  -- comes from CLK_A via DCM (divided by 4)
+    i_sysclk_en  : in  std_logic;  -- 8.867236 MHz enable signal
+    i_reset      : in  std_logic;
     -- serial bus pins
-    atn_o                 : out std_logic; -- open drain
-    clk_o                 : out std_logic; -- open drain
-    clk_i                 : in  std_logic;
-    data_o                : out std_logic; -- open drain
-    data_i                : in  std_logic;
+    atn_o        : out std_logic; -- open drain
+    clk_o        : out std_logic; -- open drain
+    clk_i        : in  std_logic;
+    data_o       : out std_logic; -- open drain
+    data_i       : in  std_logic;
     --
-    i_joy                 : in  std_logic_vector(3 downto 0); -- 0 up, 1 down, 2 left,  3 right
-    i_fire                : in  std_logic;                    -- all low active
+    i_joy        : in  std_logic_vector(3 downto 0); -- 0 up, 1 down, 2 left,  3 right
+    i_fire       : in  std_logic;                    -- all low active
     --
-    i_ram_ext_ro          : in  std_logic_vector(4 downto 0); -- read-only region if set
-    i_ram_ext             : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
+    i_ram_ext_ro : in  std_logic_vector(4 downto 0); -- read-only region if set
+    i_ram_ext    : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
     --
-	 o_ce_pix              : out std_logic;
-    o_video_r             : out std_logic_vector(3 downto 0);
-    o_video_g             : out std_logic_vector(3 downto 0);
-    o_video_b             : out std_logic_vector(3 downto 0);
-    o_hsync               : out std_logic;
-    o_vsync               : out std_logic;
-    o_hblank              : out std_logic;
-    o_vblank              : out std_logic;
-	 i_center              : in  std_logic_vector(1 downto 0);
+	 o_ce_pix     : out std_logic;
+    o_video_r    : out std_logic_vector(3 downto 0);
+    o_video_g    : out std_logic_vector(3 downto 0);
+    o_video_b    : out std_logic_vector(3 downto 0);
+    o_hsync      : out std_logic;
+    o_vsync      : out std_logic;
+    o_hblank     : out std_logic;
+    o_vblank     : out std_logic;
+	 i_center     : in  std_logic_vector(1 downto 0);
+	 i_pal        : in  std_logic;
     --
-    ps2_key               : in  std_logic_vector(10 downto 0);
+    ps2_key      : in  std_logic_vector(10 downto 0);
     --
-    o_audio               : out std_logic_vector(15 downto 0); -- runs at SYSCLK/SYSCLK_EN rate
+    o_audio      : out std_logic_vector(15 downto 0); -- runs at SYSCLK/SYSCLK_EN rate
 
     --configures "embedded" core memory
-    conf_clk              : in  std_logic;
-    conf_wr               : in  std_logic;
-    conf_ai               : in  std_logic_vector(15 downto 0);
-    conf_di               : in  std_logic_vector(7 downto 0)
+    conf_clk     : in  std_logic;
+    conf_wr      : in  std_logic;
+    conf_ai      : in  std_logic_vector(15 downto 0);
+    conf_di      : in  std_logic_vector(7 downto 0)
     );
 end;
 
@@ -96,11 +97,6 @@ end;
 --
 
 architecture RTL of VIC20 is
-
--- default
-constant K_OFFSET : std_logic_vector (4 downto 0) := "10000"; -- h position of screen to centre on your telly
--- lunar lander is WAY off to the left
---constant K_OFFSET : std_logic_vector (4 downto 0) := "11100"; -- h position of screen to centre on your telly
 
 signal reset_l            : std_logic;
 signal ena_4              : std_logic;
@@ -156,7 +152,8 @@ signal col_ram_dout       : std_logic_vector(3 downto 0);
 -- rom
 signal char_rom_dout      : std_logic_vector(7 downto 0);
 signal basic_rom_dout     : std_logic_vector(7 downto 0);
-signal kernal_rom_dout    : std_logic_vector(7 downto 0);
+signal pal_rom_dout       : std_logic_vector(7 downto 0);
+signal ntsc_rom_dout      : std_logic_vector(7 downto 0);
 
 -- expansion
 signal expansion_din      : std_logic_vector(7 downto 0);
@@ -311,9 +308,6 @@ begin
       );
 
   vic : entity work.M6561
-    generic map (
-      K_OFFSET        => K_OFFSET
-      )
     port map (
       I_CLK           => i_sysclk,
       I_ENA_4         => ena_4,
@@ -343,6 +337,7 @@ begin
 		O_VBLANK        => o_vblank,
       --
 		I_CENTER        => I_CENTER,
+		I_PAL           => i_pal,
       --
       I_LIGHT_PEN     => light_pen,
       I_POTX          => '0',
@@ -662,7 +657,7 @@ begin
 
   p_cpu_read_mux : process(p2_h, c_addr, io_sel_l, ram_sel_l, blk_sel_l,
                            v_data_read_mux, via1_dout, via2_dout, v_data_oe_l,
-                           basic_rom_dout, kernal_rom_dout, expansion_din,
+                           basic_rom_dout, i_pal, pal_rom_dout, ntsc_rom_dout, expansion_din,
 									I_RAM_EXT, ramex0_dout, ramex1_dout, ramex2_dout, ramex3_dout, cart_dout)
   begin
 
@@ -674,8 +669,10 @@ begin
       c_din <= via2_dout;
     elsif (blk_sel_l(6) = '0') then
       c_din <= basic_rom_dout;
+    elsif (blk_sel_l(7) = '0' and i_pal = '1') then
+      c_din <= pal_rom_dout;
     elsif (blk_sel_l(7) = '0') then
-      c_din <= kernal_rom_dout;
+      c_din <= ntsc_rom_dout;
     elsif (v_data_oe_l = '0') then
       c_din <= v_data_read_mux;
     elsif (ram_sel_l(1) and ram_sel_l(2) and ram_sel_l(3))='0' and I_RAM_EXT(0)='1' then
@@ -878,11 +875,20 @@ begin
     );
 
   basic_rom : entity work.gen_rom
-    generic map ("roms/basic.901486-01.mif", 13, "111")
+    generic map ("roms/basic.901486-01.mif", 13)
+    port map (
+		wrclock   => i_sysclk,
+		rdclock   => i_sysclk,
+      rdaddress => c_addr(12 downto 0),
+      q         => basic_rom_dout
+    );
+
+  kernal_rom_pal : entity work.gen_rom
+    generic map ("roms/kernal.901486-07.mif", 13, "110")
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
-      q         => basic_rom_dout,
+      q         => pal_rom_dout,
 
       wrclock   => conf_clk,
       wraddress => conf_ai,
@@ -890,12 +896,12 @@ begin
       data      => conf_di
     );
 
-  kernal_rom : entity work.gen_rom
-    generic map ("roms/kernal.901486-07.mif", 13, "110")
+  kernal_rom_ntsc : entity work.gen_rom
+    generic map ("roms/kernal.901486-06.mif", 13, "111")
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
-      q         => kernal_rom_dout,
+      q         => ntsc_rom_dout,
 
       wrclock   => conf_clk,
       wraddress => conf_ai,

@@ -122,14 +122,14 @@ parameter CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"O23,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
-	"-;",
+	"OE,TV mode,PAL,NTSC;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
 	"O9,ExtRAM 3,Off,$A000(8KB);",
 	"OB,Cart is writable,No,Yes;", 
 	"R0,Reset;",
 	"J,Fire;",
-	"V,v1.10.",`BUILD_DATE
+	"V,v1.20.",`BUILD_DATE
 };
 
 wire      extram1 = status[6];
@@ -148,15 +148,85 @@ end
 /////////////////  CLOCKS  ////////////////////////
 
 wire clk_sys;
-wire clk_v20;
-
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_v20),
-	.outclk_1(clk_sys)
+	.outclk_0(clk_sys)
 );
+
+wire pal = ~status[14];
+
+wire clk_v20;
+pll2 pll2
+(
+	.refclk(CLK_50M),
+	.rst(0),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll),
+	.outclk_0(clk_v20)
+);
+
+wire [63:0] reconfig_to_pll;
+wire [63:0] reconfig_from_pll;
+wire        cfg_waitrequest;
+reg         cfg_write;
+reg   [5:0] cfg_address;
+reg  [31:0] cfg_data;
+
+pll_hdmi_cfg pll_hdmi_cfg
+(
+	.mgmt_clk(CLK_50M),
+	.mgmt_reset(0),
+	.mgmt_waitrequest(cfg_waitrequest),
+	.mgmt_read(0),
+	.mgmt_readdata(),
+	.mgmt_write(cfg_write),
+	.mgmt_address(cfg_address),
+	.mgmt_writedata(cfg_data),
+	.reconfig_to_pll(reconfig_to_pll),
+	.reconfig_from_pll(reconfig_from_pll)
+);
+
+reg tv_reset = 0;
+always @(posedge CLK_50M) begin
+	reg pald = 0, pald2 = 0;
+	reg [2:0] state = 0;
+
+	pald  <= pal;
+	pald2 <= pald;
+
+	cfg_write <= 0;
+	if(pald2 != pald) state <= 1;
+
+	if(!cfg_waitrequest) begin
+		if(state) state<=state+1'd1;
+		case(state)
+			0: tv_reset <= 0;
+			1: begin
+					tv_reset <= 1;
+					cfg_address <= 0;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+			3: begin
+					cfg_address <= 7;
+					cfg_data <= pald2 ? 2201370713 : 2186514593;
+					cfg_write <= 1;
+				end
+			5: begin
+					cfg_address <= 5;
+					cfg_data <= pald2 ? 'h00606 : 'h20706;
+					cfg_write <= 1;
+				end
+			7: begin
+					cfg_address <= 2;
+					cfg_data <= 0;
+					cfg_write <= 1;
+				end
+		endcase
+	end
+end
 
 reg v20_en = 0;
 always @(negedge clk_v20) begin
@@ -335,7 +405,7 @@ VIC20 VIC20
 (
 	.i_sysclk(clk_v20),
 	.i_sysclk_en(v20_en),
-	.i_reset(reset),
+	.i_reset(reset|tv_reset),
 
 	//IEC
 	.atn_o(v20_iec_atn_o),
@@ -359,6 +429,7 @@ VIC20 VIC20
 	.o_hblank(hblank),
 	.o_vblank(vblank),
 	.i_center(status[13:12]+2'b11),
+	.i_pal(pal),
 
 	.ps2_key(v20_key),
 

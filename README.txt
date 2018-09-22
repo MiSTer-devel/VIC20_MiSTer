@@ -38,11 +38,12 @@ Port has follwing features:
 - Disk with write support (*.D64)
 - Partly/fully Loadable system ROM for C1541, Kernal and Basic.
 - Scandoubler with HQ2x and Scanlines
+- PAL/NTSC TV modes
 - Joystick support
 
 System ROM can be loaded from SD card. Put boot.rom into VIC20 folder.
-Content of boot.rom: C1541(16KB) + kernal(8KB) + basic(8KB)
-You can load only part of whole ROM, for example only C1541+kernal (JiffyDOS).
+Content of boot.rom: C1541(16KB) + PAL kernal(8KB) + NTSC kernal(8KB)
+You can load only part of whole ROM, for example only C1541 + PAL kernal (JiffyDOS).
 
 There are 2 ways to reset the VIC20:
 1) lctrl+lalt+ralt - cold reset with cartridge unloading - must be done before loading the new game!

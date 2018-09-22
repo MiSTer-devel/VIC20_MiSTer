@@ -22,6 +22,7 @@
 { "" "" "" "Node: emu:emu\|VIC20:VIC20\|M6561:vic\|hcnt\[1\] was determined to be a clock but was found without an associated clock assignment." {  } {  } 0 332060 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "Ignoring invalid fast I/O register assignments. See the Ignored Assignments panel in the Fitter Compilation Report for more information." {  } {  } 0 176250 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "Verilog HDL or VHDL warning at sys_top.v(601): object \"VSET\" assigned a value but never read" {  } {  } 0 10036 "" 0 0 "Design Software" 0 -1 0 ""}
+{ "" "" "" "Ignored filter at sys_top.sdc(38): VID_CLK could not be matched with a clock" {  } {  } 0 332174 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "*" {  } {  } 0 21074 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "RST" {  } {  } 0 9999 "" 0 0 "Design Software" 0 -1 0 ""}
 { "" "" "" "sysmem_HPS_fpga_interfaces.sdc" {  } {  } 0 9999 "" 0 0 "Design Software" 0 -1 0 ""}
