@@ -112,7 +112,7 @@ architecture RTL of M6561 is
   -- video size 228 pixels by 284 lines (PAL)
 
   constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := "100000101"; -- 262 -1
-  constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := "100000101"; -- 262 -1
+  constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := "100000100"; -- 261 -1
   constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := "000101011"; -- 44 -1
   constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := "011110111"; -- 248 -1
   constant NTSC_V_START            : std_logic_vector(8 downto 0) := "000010000"; -- 16
