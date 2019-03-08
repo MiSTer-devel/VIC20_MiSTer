@@ -1,0 +1,13 @@
+set_global_assignment -entity "pll2" -library "pll2" -name IP_TOOL_NAME "altera_pll"
+set_global_assignment -entity "pll2" -library "pll2" -name IP_TOOL_VERSION "13.1"
+set_global_assignment -entity "pll2" -library "pll2" -name IP_TOOL_ENV "mwpim"
+set_global_assignment -library "pll2" -name MISC_FILE [file join $::quartus(qip_path) "pll2.cmp"]
+set_global_assignment -name SYNTHESIS_ONLY_QIP ON
+
+set_global_assignment -library "pll2" -name VERILOG_FILE [file join $::quartus(qip_path) "pll2.v"]
+set_global_assignment -library "pll2" -name VERILOG_FILE [file join $::quartus(qip_path) "pll2/pll2_0002.v"]
+set_global_assignment -library "pll2" -name QIP_FILE [file join $::quartus(qip_path) "pll2/pll2_0002_q13.qip"]
+
+set_global_assignment -entity "pll2_0002" -library "pll2" -name IP_TOOL_NAME "altera_pll"
+set_global_assignment -entity "pll2_0002" -library "pll2" -name IP_TOOL_VERSION "13.1"
+set_global_assignment -entity "pll2_0002" -library "pll2" -name IP_TOOL_ENV "mwpim"

@@ -1,8 +1,8 @@
 //============================================================================
-//  C16
+//  VIC20
 //
 //  Port to MiSTer
-//  Copyright (C) 2017,2018 Sorgelig
+//  Copyright (C) 2017-2019 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -48,6 +48,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output [1:0]  VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -94,9 +96,28 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR,
+
+	// Open-drain User port.
+	// 0 - D+/RX
+	// 1 - D-/TX
+	// 2..5 - USR1..USR4
+	// Set USER_OUT to 1 to read from USER_IN.
+	input   [5:0] USER_IN,
+	output  [5:0] USER_OUT,
+
+	input         OSD_STATUS
 );
 
+assign USER_OUT = '1;
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
@@ -108,8 +129,6 @@ assign LED_POWER = 0;
 assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
 
-wire [1:0] scale = status[3:2];
-
 `include "build_id.v" 
 parameter CONF_STR = {
 	"VIC20;;",
@@ -120,7 +139,7 @@ parameter CONF_STR = {
 	"S,D64;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
-	"O23,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
 	"OE,TV mode,PAL,NTSC;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
@@ -129,7 +148,7 @@ parameter CONF_STR = {
 	"OB,Cart is writable,No,Yes;", 
 	"R0,Reset;",
 	"J,Fire;",
-	"V,v1.20.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 wire      extram1 = status[6];
@@ -455,40 +474,56 @@ assign AUDIO_S = 0;
 wire hs, vs, hblank, vblank, ce_pix;
 wire [3:0] r,g,b;
 
-wire scandoubler = scale || forced_scandoubler;
+wire [2:0] scale = status[4:2];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 
 wire ce_sd;
+assign VGA_F1 = 0;
+assign VGA_SL = sl[1:0];
 assign CLK_VIDEO = clk_v20;
-assign CE_PIXEL = scandoubler ? ce_sd : v20_en;
 
-video_mixer #(256, 1) mixer
+
+wire [3:0] R,G,B;
+wire VSync,HSync,HBlank,VBlank;
+
+video_cleaner video_cleaner
 (
-	.clk_sys(CLK_VIDEO),
-	
+	.clk_vid(CLK_VIDEO),
 	.ce_pix(ce_pix),
-	.ce_pix_out(ce_sd),
-
-	.hq2x(scale == 1),
-	.scanlines({scale==3, scale==2}),
-	.scandoubler(scandoubler),
 
 	.R(r),
 	.G(g),
 	.B(b),
-
-	.mono(0),
 
 	.HSync(~hs),
 	.VSync(~vs),
 	.HBlank(hblank),
 	.VBlank(vblank),
 
-	.VGA_R(VGA_R),
-	.VGA_G(VGA_G),
-	.VGA_B(VGA_B),
-	.VGA_VS(VGA_VS),
-	.VGA_HS(VGA_HS),
-	.VGA_DE(VGA_DE)
+	// video output signals
+	.VGA_R(R),
+	.VGA_G(G),
+	.VGA_B(B),
+	.VGA_VS(VSync),
+	.VGA_HS(HSync),
+
+	// optional aligned blank
+	.HBlank_out(HBlank),
+	.VBlank_out(VBlank)
+); 
+
+video_mixer #(256, 1) mixer
+(
+	.*,
+
+	.clk_sys(CLK_VIDEO),
+	.ce_pix_out(CE_PIXEL),
+
+	.hq2x(scale == 1),
+	.scanlines(0),
+	.scandoubler(scale || forced_scandoubler),
+
+	.mono(0)
 );
 
 ///////////////////////////////////////////////////

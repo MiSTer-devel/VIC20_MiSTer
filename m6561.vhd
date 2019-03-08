@@ -447,12 +447,12 @@ begin
           hsync <= '0';
         end if;
         if do_hsync then
-          if (vcnt = TOTAL_LINES_M1) then
+          if (vcnt = TOTAL_LINES_M1-3) then
             vblank <= '1';
           elsif (vcnt = V_START) then
             vblank <= '0';
           end if;
-          if (vcnt_c = TOTAL_LINES_M1) then
+          if (vcnt_c = TOTAL_LINES_M1-3) then
             vblank_c <= '1';
           elsif (vcnt_c = V_START) then
             vblank_c <= '0';
