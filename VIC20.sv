@@ -120,9 +120,8 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
  
-assign LED_USER  = ioctl_download | led_disk;
+assign LED_USER  = ioctl_download | led_disk | tape_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
@@ -137,6 +136,11 @@ parameter CONF_STR = {
 	"F,CRT,Load Cart;",
 	"F,CT?,Load Cart;",
 	"S,D64;",
+	"-;",
+	"F,TAP,Tape Load;",
+	"RG,Tape Play/Pause;",
+	"RI,Tape Unload;",
+	"OH,Tape Sound,Off,On;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -166,24 +170,16 @@ end
 
 /////////////////  CLOCKS  ////////////////////////
 
-wire clk_sys;
+wire pal = ~status[14];
+
+wire clk_sys, clk_mem;
 pll pll
 (
 	.refclk(CLK_50M),
-	.rst(0),
-	.outclk_0(clk_sys)
-);
-
-wire pal = ~status[14];
-
-wire clk_v20;
-pll2 pll2
-(
-	.refclk(CLK_50M),
-	.rst(0),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(clk_v20)
+	.outclk_0(clk_sys),
+	.outclk_1(clk_mem)
 );
 
 wire [63:0] reconfig_to_pll;
@@ -248,7 +244,7 @@ always @(posedge CLK_50M) begin
 end
 
 reg v20_en = 0;
-always @(negedge clk_v20) begin
+always @(negedge clk_sys) begin
 	reg [1:0] div = 0;
 
 	div <= div + 1'd1;
@@ -267,6 +263,7 @@ wire [10:0] ps2_key;
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
 wire        ioctl_wr;
+reg         ioctl_wait;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire [31:0] ioctl_file_ext;
@@ -302,6 +299,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 	.ioctl_file_ext(ioctl_file_ext),
+	.ioctl_wait(ioctl_wait),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -413,7 +411,7 @@ end
 wire [15:0] joy = joya | joyb;
 
 reg [10:0] v20_key;
-always @(posedge clk_v20) begin
+always @(posedge clk_sys) begin
 	reg [10:0] key;
 	
 	key <= ps2_key;
@@ -422,7 +420,7 @@ end
 
 VIC20 VIC20
 (
-	.i_sysclk(clk_v20),
+	.i_sysclk(clk_sys),
 	.i_sysclk_en(v20_en),
 	.i_reset(reset|tv_reset),
 
@@ -453,7 +451,11 @@ VIC20 VIC20
 	.ps2_key(v20_key),
 
 	.o_audio(audio),
-	
+
+	.cass_read(cass_do),
+	.cass_motor(cass_motor),
+	.cass_sw(~tap_play),
+
 	.conf_clk(clk_sys),
 	.conf_ai(dl_addr),
 	.conf_di(dl_data),
@@ -466,7 +468,7 @@ wire v20_iec_clk_o;
 
 wire [15:0] audio;
 
-assign AUDIO_L = audio[15:1];
+assign AUDIO_L = {1'b0,audio[15:1]} + {cass_aud,10'd0};
 assign AUDIO_R = AUDIO_L;
 assign AUDIO_MIX = 0;
 assign AUDIO_S = 0;
@@ -480,7 +482,7 @@ wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 wire ce_sd;
 assign VGA_F1 = 0;
 assign VGA_SL = sl[1:0];
-assign CLK_VIDEO = clk_v20;
+assign CLK_VIDEO = clk_sys;
 
 
 wire [3:0] R,G,B;
@@ -535,24 +537,25 @@ wire c1541_iec_clk_o;
 
 c1541_sd c1541_sd
 (
-	.clk32 (clk_sys),
+	.clk_c1541(clk_sys & ce_c1541),
+	.clk_sys(clk_sys),
 
-	.c1541rom_clk(clk_sys),
-	.c1541rom_addr(ioctl_addr[13:0]),
-	.c1541rom_data(ioctl_dout),
-	.c1541rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
+	.rom_addr(ioctl_addr[13:0]),
+	.rom_data(ioctl_dout),
+	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
+	.rom_std(0),
 
-   .disk_change ( img_mounted ),
-	.disk_readonly ( img_readonly ),
+   .disk_change(img_mounted ),
+	.disk_readonly(img_readonly ),
 
-	.iec_reset_i( reset          ),
+	.iec_reset_i( reset|tv_reset ),
 	.iec_atn_i  ( v20_iec_atn_o  ),
 	.iec_data_i ( v20_iec_data_o ),
 	.iec_clk_i  ( v20_iec_clk_o  ),
 	.iec_data_o ( c1541_iec_data_o ),
 	.iec_clk_o  ( c1541_iec_clk_o  ),
 
-   .led (led_disk),
+   .led(led_disk),
 
 	.sd_lba(sd_lba),
 	.sd_rd(sd_rd),
@@ -562,6 +565,131 @@ c1541_sd c1541_sd
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr)
+);
+
+reg ce_c1541;
+always @(negedge clk_sys) begin
+	int sum = 0;
+	int msum;
+	
+	msum <= pal ? 35468944 : 32727260;
+
+	ce_c1541 <= 0;
+	sum = sum + 32000000;
+	if(sum >= msum) begin
+		sum = sum - msum;
+		ce_c1541 <= 1;
+	end
+end 
+
+/////////////////////////////////////////////////
+
+assign DDRAM_CLK = clk_sys;
+ddram ddram
+(
+	.*,
+	.addr((ioctl_download & tap_load) ? ioctl_addr : tap_play_addr),
+	.dout(tap_data),
+	.din(ioctl_dout),
+	.we(tap_wr),
+	.rd(tap_rd),
+	.ready(tap_data_ready)
+);
+
+reg tap_wr;
+always @(posedge clk_sys) begin
+	reg old_reset;
+
+	old_reset <= reset;
+	if(~old_reset && reset) ioctl_wait <= 0;
+
+	tap_wr <= 0;
+	if(ioctl_wr & tap_load) begin
+		ioctl_wait <= 1;
+		tap_wr <= 1;
+	end
+	else if(~tap_wr & ioctl_wait & tap_data_ready) begin
+		ioctl_wait <= 0;
+	end
+end
+
+reg        tap_rd;
+wire       tap_finish;
+reg [24:0] tap_play_addr;
+reg [24:0] tap_last_addr;
+wire [7:0] tap_data;
+wire       tap_data_ready;
+wire       tap_reset = reset | (ioctl_download & tap_load) | status[18];
+reg        tap_wrreq;
+wire       tap_wrfull;
+wire       tap_loaded = (tap_play_addr < tap_last_addr);
+reg        tap_play;
+wire       tap_play_btn = status[16];
+wire       tap_load = (ioctl_index == 5);
+
+always @(posedge clk_sys) begin
+	reg tap_play_btnD, tap_finishD;
+	reg tap_cycle = 0;
+
+	tap_play_btnD <= tap_play_btn;
+	tap_finishD <= tap_finish;
+
+	if(tap_reset) begin
+		//C1530 module requires one more byte at the end due to fifo early check.
+		tap_last_addr <= ioctl_download ? ioctl_addr+2'd2 : 25'd0;
+		tap_play_addr <= 0;
+		tap_play <= ioctl_download;
+		tap_rd <= 0;
+		tap_cycle <= 0;
+	end
+	else begin
+		if (~tap_play_btnD & tap_play_btn) tap_play <= ~tap_play;
+		if (~tap_finishD & tap_finish) tap_play <= 0;
+
+		tap_rd <= 0;
+		tap_wrreq <= 0;
+
+		if(~tap_rd & ~tap_wrreq) begin
+			if(tap_cycle) begin
+				if(tap_data_ready) begin
+					tap_play_addr <= tap_play_addr + 1'd1;
+					tap_cycle <= 0;
+					tap_wrreq <= 1;
+				end
+			end
+			else begin
+				if(~tap_wrfull & tap_loaded) begin
+					tap_rd <= 1;
+					tap_cycle <= 1;
+				end
+			end
+		end
+	end
+end
+
+reg [26:0] act_cnt;
+always @(posedge clk_sys) act_cnt <= act_cnt + (tap_play ? 4'd8 : 4'd1);
+wire tape_led = tap_loaded && (act_cnt[26] ? (~(tap_play & cass_motor) && act_cnt[25:18] > act_cnt[7:0]) : act_cnt[25:18] <= act_cnt[7:0]);
+
+wire cass_motor;
+wire cass_do;
+wire cass_aud = cass_do & status[17] & tap_play & ~cass_motor;
+
+c1530 c1530
+(
+	.clk(clk_sys),
+	.restart(tap_reset),
+
+	.clk_freq(32),
+	.cpu_freq(1),
+
+	.din(tap_data),
+	.wr(tap_wrreq),
+	.full(tap_wrfull),
+	.empty(tap_finish),
+
+	.play(~cass_motor & tap_play),
+	.dout(cass_do)
 );
 
 endmodule

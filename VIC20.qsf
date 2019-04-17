@@ -351,9 +351,9 @@ set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 
 set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
-set_global_assignment -name QIP_FILE pll2.qip
 set_global_assignment -name QIP_FILE c1541/c1541.qip
 set_global_assignment -name QIP_FILE t65/t65.qip
+set_global_assignment -name SYSTEMVERILOG_FILE ddram.sv
 set_global_assignment -name VHDL_FILE gen_rom.vhd
 set_global_assignment -name VHDL_FILE gen_dpram.vhd
 set_global_assignment -name VHDL_FILE ram_conf_8192x8.vhd
@@ -364,6 +364,7 @@ set_global_assignment -name VHDL_FILE generic_rom.vhd
 set_global_assignment -name VHDL_FILE vic20_clocks.vhd
 set_global_assignment -name VHDL_FILE fpga64_keyboard.vhd
 set_global_assignment -name VHDL_FILE rc_filter_1o.vhd
+set_global_assignment -name VHDL_FILE c1530.vhd
 set_global_assignment -name VHDL_FILE m6561.vhd
 set_global_assignment -name VHDL_FILE m6522.vhd
 set_global_assignment -name VHDL_FILE vic20.vhd

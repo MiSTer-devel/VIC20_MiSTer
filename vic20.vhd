@@ -52,45 +52,50 @@ library ieee ;
   use ieee.numeric_std.all;
 
 entity VIC20 is
-  port (
-    --
-    i_sysclk     : in  std_logic;  -- comes from CLK_A via DCM (divided by 4)
-    i_sysclk_en  : in  std_logic;  -- 8.867236 MHz enable signal
-    i_reset      : in  std_logic;
-    -- serial bus pins
-    atn_o        : out std_logic; -- open drain
-    clk_o        : out std_logic; -- open drain
-    clk_i        : in  std_logic;
-    data_o       : out std_logic; -- open drain
-    data_i       : in  std_logic;
-    --
-    i_joy        : in  std_logic_vector(3 downto 0); -- 0 up, 1 down, 2 left,  3 right
-    i_fire       : in  std_logic;                    -- all low active
-    --
-    i_ram_ext_ro : in  std_logic_vector(4 downto 0); -- read-only region if set
-    i_ram_ext    : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
-    --
-	 o_ce_pix     : out std_logic;
-    o_video_r    : out std_logic_vector(3 downto 0);
-    o_video_g    : out std_logic_vector(3 downto 0);
-    o_video_b    : out std_logic_vector(3 downto 0);
-    o_hsync      : out std_logic;
-    o_vsync      : out std_logic;
-    o_hblank     : out std_logic;
-    o_vblank     : out std_logic;
-	 i_center     : in  std_logic_vector(1 downto 0);
-	 i_pal        : in  std_logic;
-    --
-    ps2_key      : in  std_logic_vector(10 downto 0);
-    --
-    o_audio      : out std_logic_vector(15 downto 0); -- runs at SYSCLK/SYSCLK_EN rate
+	port (
+		--
+		i_sysclk     : in  std_logic;  -- comes from CLK_A via DCM (divided by 4)
+		i_sysclk_en  : in  std_logic;  -- 8.867236 MHz enable signal
+		i_reset      : in  std_logic;
+		-- serial bus pins
+		atn_o        : out std_logic; -- open drain
+		clk_o        : out std_logic; -- open drain
+		clk_i        : in  std_logic;
+		data_o       : out std_logic; -- open drain
+		data_i       : in  std_logic;
+		--
+		i_joy        : in  std_logic_vector(3 downto 0); -- 0 up, 1 down, 2 left,  3 right
+		i_fire       : in  std_logic;                    -- all low active
+		--
+		i_ram_ext_ro : in  std_logic_vector(4 downto 0); -- read-only region if set
+		i_ram_ext    : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
+		--
+		o_ce_pix     : out std_logic;
+		o_video_r    : out std_logic_vector(3 downto 0);
+		o_video_g    : out std_logic_vector(3 downto 0);
+		o_video_b    : out std_logic_vector(3 downto 0);
+		o_hsync      : out std_logic;
+		o_vsync      : out std_logic;
+		o_hblank     : out std_logic;
+		o_vblank     : out std_logic;
+		i_center     : in  std_logic_vector(1 downto 0);
+		i_pal        : in  std_logic;
+		--
+		ps2_key      : in  std_logic_vector(10 downto 0);
+		--
+		o_audio      : out std_logic_vector(15 downto 0); -- runs at SYSCLK/SYSCLK_EN rate
 
-    --configures "embedded" core memory
-    conf_clk     : in  std_logic;
-    conf_wr      : in  std_logic;
-    conf_ai      : in  std_logic_vector(15 downto 0);
-    conf_di      : in  std_logic_vector(7 downto 0)
-    );
+		cass_write   : out std_logic;
+		cass_read    : in  std_logic;
+		cass_motor   : out std_logic;
+		cass_sw      : in  std_logic;
+
+		--configures "embedded" core memory
+		conf_clk     : in  std_logic;
+		conf_wr      : in  std_logic;
+		conf_ai      : in  std_logic_vector(15 downto 0);
+		conf_di      : in  std_logic_vector(7 downto 0)
+	);
 end;
 
 -- PAL version runs with a 8,867,236 Hz Quartz which is divided by two
@@ -167,11 +172,6 @@ signal via1_pa_out        : std_logic_vector(7 downto 0);
 
 signal via2_irq_l         : std_logic;
 
-signal cass_write         : std_logic;
-signal cass_read          : std_logic;
-signal cass_motor         : std_logic;
-signal cass_sw            : std_logic;
-
 signal keybd_col_out      : std_logic_vector(7 downto 0);
 signal keybd_col_out_oe_l : std_logic_vector(7 downto 0);
 signal keybd_col_out_s    : std_logic_vector(7 downto 0);
@@ -209,12 +209,14 @@ signal vsync              : std_logic;
 signal reset_key          : std_logic;
 signal reset              : std_logic;
 
-signal iec_data_d1    : std_logic;
-signal iec_clk_d1     : std_logic;
-signal iec_data_d2    : std_logic;
-signal iec_clk_d2     : std_logic;
-signal iec_data       : std_logic;
-signal iec_clk        : std_logic;
+signal iec_data_d1        : std_logic;
+signal iec_clk_d1         : std_logic;
+signal iec_data_d2        : std_logic;
+signal iec_clk_d2         : std_logic;
+signal iec_data           : std_logic;
+signal iec_clk            : std_logic;
+
+signal motor              : std_logic;
 
 begin
 
@@ -247,10 +249,7 @@ begin
   -- <= user_port_out_oe_l
 
   -- tape
-  cass_read <= '0';
-  --<= cass_write;
-  --<= cass_motor
-  cass_sw <= '1'; -- sense casette buttons
+  cass_motor <= motor;
 
   -- serial
   serial_srq_in <= '1';
@@ -418,8 +417,8 @@ begin
       O_IRQ_L         => via1_nmi_l, -- note, not open drain
 
       I_CA1           => keybd_restore,
-      I_CA2           => cass_motor,
-      O_CA2           => cass_motor,
+      I_CA2           => motor,
+      O_CA2           => motor,
       O_CA2_OE_L      => open,
 
       I_PA            => via1_pa_in,
@@ -491,7 +490,7 @@ begin
       O_PB_OE_L       => keybd_col_out_oe_l
       );
 
-  --	cass_write <= keybd_col_out(3);
+  cass_write <= keybd_col_out(3);
   keybd_row_out_s <= keybd_row_out or keybd_row_out_oe_l;
   keybd_col_out_s <= keybd_col_out or keybd_col_out_oe_l;
 
