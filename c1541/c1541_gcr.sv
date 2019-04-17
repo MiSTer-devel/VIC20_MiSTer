@@ -97,22 +97,22 @@ always @(posedge clk32) begin
 	mode_r1 <= mode;
 
 	if (mode_r1 ^ mode) begin		// read <-> write change
-		bit_clk_cnt <= 0;
+		bit_clk_cnt = 0;
 		byte_n <= 1;
 		bit_clk_en <= 0;
 	end else begin
 		bit_clk_en <= 0;
 		if (bit_clk_cnt == 111) begin
 			bit_clk_en <= 1;
-			bit_clk_cnt <= 0;
-		end
-		else begin
-			bit_clk_cnt <= bit_clk_cnt + 1'b1;
-		end
+			bit_clk_cnt = 0;
+		end else
+		bit_clk_cnt = bit_clk_cnt + 1'b1;
 
 		byte_n <= 1;
 		if (~byte_in_n & mtr & ram_ready) begin
-			if ((bit_clk_cnt > 15) && (bit_clk_cnt < 93)) byte_n <= 0;
+			if (bit_clk_cnt > 16) begin
+				if (bit_clk_cnt < 94) byte_n <= 0;
+			end
 		end
 	end
 end
