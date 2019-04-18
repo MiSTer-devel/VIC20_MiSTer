@@ -172,14 +172,13 @@ end
 
 wire pal = ~status[14];
 
-wire clk_sys, clk_mem;
+wire clk_sys;
 pll pll
 (
 	.refclk(CLK_50M),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(clk_sys),
-	.outclk_1(clk_mem)
+	.outclk_0(clk_sys)
 );
 
 wire [63:0] reconfig_to_pll;
@@ -619,7 +618,7 @@ reg [24:0] tap_play_addr;
 reg [24:0] tap_last_addr;
 wire [7:0] tap_data;
 wire       tap_data_ready;
-wire       tap_reset = reset | (ioctl_download & tap_load) | status[18];
+wire       tap_reset = reset | (ioctl_download & tap_load) | status[18] | (cass_motor & ((tap_last_addr - tap_play_addr) < 80));
 reg        tap_wrreq;
 wire       tap_wrfull;
 wire       tap_loaded = (tap_play_addr < tap_last_addr);
@@ -680,8 +679,8 @@ c1530 c1530
 	.clk(clk_sys),
 	.restart(tap_reset),
 
-	.clk_freq(32),
-	.cpu_freq(1),
+	.clk_freq(35468944),
+	.cpu_freq(985249), // it seems this value works better than original.
 
 	.din(tap_data),
 	.wr(tap_wrreq),
