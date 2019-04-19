@@ -150,6 +150,7 @@ parameter CONF_STR = {
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
 	"O9,ExtRAM 3,Off,$A000(8KB);",
 	"OB,Cart is writable,No,Yes;", 
+	"OF,Kernal,Loadable,Standard;",
 	"R0,Reset;",
 	"J,Fire;",
 	"V,v",`BUILD_DATE
@@ -417,6 +418,9 @@ always @(posedge clk_sys) begin
 	v20_key <= key;
 end
 
+reg rom_std;
+always @(posedge clk_sys) if(reset) rom_std <= status[15];
+
 VIC20 VIC20
 (
 	.i_sysclk(clk_sys),
@@ -455,6 +459,7 @@ VIC20 VIC20
 	.cass_motor(cass_motor),
 	.cass_sw(~tap_play),
 
+	.rom_std(rom_std),
 	.conf_clk(clk_sys),
 	.conf_ai(dl_addr),
 	.conf_di(dl_data),
@@ -542,7 +547,7 @@ c1541_sd c1541_sd
 	.rom_addr(ioctl_addr[13:0]),
 	.rom_data(ioctl_dout),
 	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
-	.rom_std(0),
+	.rom_std(rom_std),
 
    .disk_change(img_mounted ),
 	.disk_readonly(img_readonly ),

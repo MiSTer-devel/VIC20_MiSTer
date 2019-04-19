@@ -91,6 +91,7 @@ entity VIC20 is
 		cass_sw      : in  std_logic;
 
 		--configures "embedded" core memory
+		rom_std      : in  std_logic;
 		conf_clk     : in  std_logic;
 		conf_wr      : in  std_logic;
 		conf_ai      : in  std_logic_vector(15 downto 0);
@@ -158,8 +159,10 @@ signal col_ram_dout       : std_logic_vector(3 downto 0);
 -- rom
 signal char_rom_dout      : std_logic_vector(7 downto 0);
 signal basic_rom_dout     : std_logic_vector(7 downto 0);
-signal pal_rom_dout       : std_logic_vector(7 downto 0);
-signal ntsc_rom_dout      : std_logic_vector(7 downto 0);
+signal pal_rom_dout_dl    : std_logic_vector(7 downto 0);
+signal ntsc_rom_dout_dl   : std_logic_vector(7 downto 0);
+signal pal_rom_dout_o     : std_logic_vector(7 downto 0);
+signal ntsc_rom_dout_o    : std_logic_vector(7 downto 0);
 
 -- expansion
 signal expansion_din      : std_logic_vector(7 downto 0);
@@ -641,7 +644,7 @@ begin
 
   p_cpu_read_mux : process(p2_h, c_addr, io_sel_l, ram_sel_l, blk_sel_l,
                            v_data_read_mux, via1_dout, via2_dout, v_data_oe_l,
-                           basic_rom_dout, i_pal, pal_rom_dout, ntsc_rom_dout, expansion_din,
+                           basic_rom_dout, i_pal, pal_rom_dout_dl, ntsc_rom_dout_dl, pal_rom_dout_o, ntsc_rom_dout_o, expansion_din,
 									I_RAM_EXT, ramex0_dout, ramex1_dout, ramex2_dout, ramex3_dout, cart_dout)
   begin
 
@@ -654,9 +657,9 @@ begin
     elsif (blk_sel_l(6) = '0') then
       c_din <= basic_rom_dout;
     elsif (blk_sel_l(7) = '0' and i_pal = '1') then
-      c_din <= pal_rom_dout;
+      c_din <= pal_rom_dout_dl and pal_rom_dout_o;
     elsif (blk_sel_l(7) = '0') then
-      c_din <= ntsc_rom_dout;
+      c_din <= ntsc_rom_dout_dl and ntsc_rom_dout_o;
     elsif (v_data_oe_l = '0') then
       c_din <= v_data_read_mux;
     elsif (ram_sel_l(1) and ram_sel_l(2) and ram_sel_l(3))='0' and I_RAM_EXT(0)='1' then
@@ -872,7 +875,8 @@ begin
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
-      q         => pal_rom_dout,
+      q         => pal_rom_dout_dl,
+		cs        => not rom_std,
 
       wrclock   => conf_clk,
       wraddress => conf_ai,
@@ -885,7 +889,8 @@ begin
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
-      q         => ntsc_rom_dout,
+      q         => ntsc_rom_dout_dl,
+		cs        => not rom_std,
 
       wrclock   => conf_clk,
       wraddress => conf_ai,
@@ -893,6 +898,26 @@ begin
       data      => conf_di
     );
 
+  kernal_rom_pal_o : entity work.gen_rom
+    generic map ("roms/kernal.901486-07.mif", 13)
+    port map (
+		wrclock   => i_sysclk,
+		rdclock   => i_sysclk,
+      rdaddress => c_addr(12 downto 0),
+      q         => pal_rom_dout_o,
+		cs        => rom_std
+    );
+
+  kernal_rom_ntsc_o : entity work.gen_rom
+    generic map ("roms/kernal.901486-06.mif", 13)
+    port map (
+		wrclock   => i_sysclk,
+		rdclock   => i_sysclk,
+      rdaddress => c_addr(12 downto 0),
+      q         => ntsc_rom_dout_o,
+		cs        => rom_std
+    );
+	 
   p_video_output : process
   begin
     wait until rising_edge(i_sysclk);
