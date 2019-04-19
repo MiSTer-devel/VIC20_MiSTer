@@ -34,6 +34,7 @@ Port has follwing features:
 - Options for 3 extended RAM regions.
 - Automatic screen centering (many Vic20 games have off-center screen)
 - Support for *.PRG files.
+- Support for *.TAP files
 - Cartridge support with and without header.
 - Disk with write support (*.D64)
 - Partly/fully Loadable system ROM for C1541, Kernal and Basic.
