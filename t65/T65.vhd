@@ -151,7 +151,7 @@ entity T65 is
     DI      : in  std_logic_vector(7 downto 0);
     DO      : out std_logic_vector(7 downto 0);
     DEBUG   : out T_t65_dbg;
-	 NMI_ack : out std_logic
+    NMI_ack : out std_logic
   );
 end T65;
 
@@ -463,7 +463,7 @@ begin
             tmpP(Flag_I) := '1';
           end if;
           if RstCycle = '1' then
-            tmpP(Flag_I) := '0';
+            tmpP(Flag_I) := '1';
             tmpP(Flag_D) := '0';
           end if;
           tmpP(Flag_1) := '1';
@@ -507,8 +507,8 @@ begin
       DL <= (others => '0');
     elsif Clk'event and Clk = '1' then
       if (Enable = '1') then
-        NMI_entered <= '0';
         if (really_rdy = '1') then
+          NMI_entered <= '0';
           BusA_r <= BusA;
           BusB <= DI;
 
