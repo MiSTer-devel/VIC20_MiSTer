@@ -188,7 +188,8 @@ pll pll
 	.refclk(CLK_50M),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
-	.outclk_0(clk_sys)
+	.outclk_0(clk_sys),
+	.outclk_1(CLK_VIDEO)
 );
 
 wire [63:0] reconfig_to_pll;
@@ -235,15 +236,10 @@ always @(posedge CLK_50M) begin
 				end
 			3: begin
 					cfg_address <= 7;
-					cfg_data <= pald2 ? 2201370713 : 2186514593;
+					cfg_data <= pald2 ? 3999921597 : 702796321;
 					cfg_write <= 1;
 				end
 			5: begin
-					cfg_address <= 5;
-					cfg_data <= pald2 ? 'h00606 : 'h20706;
-					cfg_write <= 1;
-				end
-			7: begin
 					cfg_address <= 2;
 					cfg_data <= 0;
 					cfg_write <= 1;
@@ -449,7 +445,7 @@ VIC20 VIC20
 	.i_ram_ext_ro(cart_blk & ~{5{status[11]}}),
 	.i_ram_ext({extram3,extram2,extram1}|cart_blk),
 
-	.o_ce_pix(ce_pix),
+	.o_ce_pix(i_ce_pix),
 	.o_video_r(r),
 	.o_video_g(g),
 	.o_video_b(b),
@@ -486,7 +482,7 @@ assign AUDIO_R = AUDIO_L;
 assign AUDIO_MIX = 0;
 assign AUDIO_S = 0;
 
-wire hs, vs, hblank, vblank, ce_pix;
+wire hs, vs, hblank, vblank, i_ce_pix;
 wire [3:0] r,g,b;
 
 wire [2:0] scale = status[4:2];
@@ -495,11 +491,26 @@ wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
 wire ce_sd;
 assign VGA_F1 = 0;
 assign VGA_SL = sl[1:0];
-assign CLK_VIDEO = clk_sys;
+
+reg ce_pix;
+always @(posedge CLK_VIDEO) begin
+	reg old_ce;
+	
+	old_ce <= i_ce_pix;
+	ce_pix <= ~old_ce & i_ce_pix;
+end
 
 
 wire [3:0] R,G,B;
 wire VSync,HSync,HBlank,VBlank;
+
+reg hs_o, vs_o;
+always @(posedge CLK_VIDEO) begin
+	if(ce_pix) begin
+		hs_o <= ~hs;
+		if(~hs_o & ~hs) vs_o <= ~vs;
+	end
+end
 
 video_cleaner video_cleaner
 (
@@ -510,8 +521,8 @@ video_cleaner video_cleaner
 	.G(g),
 	.B(b),
 
-	.HSync(~hs),
-	.VSync(~vs),
+	.HSync(hs_o),
+	.VSync(vs_o),
 	.HBlank(hblank),
 	.VBlank(vblank),
 
