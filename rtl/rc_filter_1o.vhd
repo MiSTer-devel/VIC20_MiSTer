@@ -97,12 +97,12 @@ begin
   assert false report "Alpha error: " & real'image(aerror_c) & "%" severity note;
 
   -- the main IIC routine, classic "textbook" implementation
-  iir_proc : process (res_i, clk_i) is
+  iir_proc : process (clk_i) is
   begin
-    if (res_i = '1') then
-      dlocal_s <= (others => '0');
-    elsif rising_edge(clk_i) then
-      if (clken_i = '1') then
+    if rising_edge(clk_i) then
+      if (res_i = '1') then
+        dlocal_s <= (others => '0');
+      elsif (clken_i = '1') then
         dlocal_s <= dlocal_s + conv_signed(dig_alpha_c,cwidth_g)*(unsigned(din_i)-dlocal_s(dwidthi_g+cwidth_g downto cwidth_g));
       end if;
     end if;

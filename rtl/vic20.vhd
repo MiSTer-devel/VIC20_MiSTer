@@ -868,7 +868,7 @@ begin
   -- roms
   --
   char_rom : entity work.gen_rom
-    generic map ("roms/characters.901460-03.mif", 12)
+    generic map ("rtl/roms/characters.901460-03.mif", 12)
     port map (
 		wrclock   => i_sysclk,
 		rdclock   => i_sysclk,
@@ -877,7 +877,7 @@ begin
     );
 
   basic_rom : entity work.gen_rom
-    generic map ("roms/basic.901486-01.mif", 13)
+    generic map ("rtl/roms/basic.901486-01.mif", 13)
     port map (
 		wrclock   => i_sysclk,
 		rdclock   => i_sysclk,
@@ -886,7 +886,7 @@ begin
     );
 
   kernal_rom_pal : entity work.gen_rom
-    generic map ("roms/kernal.901486-07.mif", 13, "110")
+    generic map ("rtl/roms/kernal.901486-07.mif", 13, "110")
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
@@ -900,7 +900,7 @@ begin
     );
 
   kernal_rom_ntsc : entity work.gen_rom
-    generic map ("roms/kernal.901486-06.mif", 13, "111")
+    generic map ("rtl/roms/kernal.901486-06.mif", 13, "111")
     port map (
 		rdclock   => i_sysclk,
       rdaddress => c_addr(12 downto 0),
@@ -914,7 +914,7 @@ begin
     );
 
   kernal_rom_pal_o : entity work.gen_rom
-    generic map ("roms/kernal.901486-07.mif", 13)
+    generic map ("rtl/roms/kernal.901486-07.mif", 13)
     port map (
 		wrclock   => i_sysclk,
 		rdclock   => i_sysclk,
@@ -924,7 +924,7 @@ begin
     );
 
   kernal_rom_ntsc_o : entity work.gen_rom
-    generic map ("roms/kernal.901486-06.mif", 13)
+    generic map ("rtl/roms/kernal.901486-06.mif", 13)
     port map (
 		wrclock   => i_sysclk,
 		rdclock   => i_sysclk,

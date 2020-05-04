@@ -285,6 +285,8 @@ wire        sd_buff_wr;
 wire        img_mounted;
 wire        img_readonly;
 
+wire [21:0] gamma_bus;
+
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -295,6 +297,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
 
 	.ps2_key(ps2_key),
 
@@ -538,11 +541,11 @@ video_cleaner video_cleaner
 	.VBlank_out(VBlank)
 ); 
 
-video_mixer #(256, 1) mixer
+video_mixer #(256, 1, 1) mixer
 (
 	.*,
 
-	.clk_sys(CLK_VIDEO),
+	.clk_vid(CLK_VIDEO),
 	.ce_pix_out(CE_PIXEL),
 
 	.hq2x(scale == 1),
