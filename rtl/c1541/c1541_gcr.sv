@@ -17,22 +17,23 @@
 
 module c1541_gcr
 (
-   input            clk32,
-   output reg [7:0] dout,		// data from ram to 1541 logic
-   input      [7:0] din,		// data from 1541 logic to ram
-   input            mode,		// read/write
-   input            mtr,		// stepper motor on/off
-   output           sync_n,		// reading SYNC bytes
-   output reg       byte_n,		// byte ready
+	input            clk32,
+	output reg [7:0] dout,    // data from ram to 1541 logic
+	input      [7:0] din,     // data from 1541 logic to ram
+	input            mode,    // read/write
+	input            mtr,     // stepper motor on/off
+	input      [1:0] freq,    // motor (gcr_bit) frequency
+	output           sync_n,  // reading SYNC bytes
+	output reg       byte_n,  // byte ready
 
-   input      [5:0] track,
-   output reg [4:0] sector,
-   output reg [7:0] byte_addr,
+	input      [5:0] track,
+	output reg [4:0] sector,
+	output reg [7:0] byte_addr,
 
-   input      [7:0] ram_do,
-   output reg [7:0] ram_di,
-   output reg       ram_we,
-   input            ram_ready
+	input      [7:0] ram_do,
+	output reg [7:0] ram_di,
+	output reg       ram_we,
+	input            ram_ready
 );
 
 assign sync_n = ~(mtr & ram_ready) | sync_in_n;
@@ -89,6 +90,8 @@ always_comb begin
 	endcase
 end
 
+wire [7:0] bit_clk_div = (freq == 3) ? 8'h67 : (freq == 2) ? 8'h6F : (freq == 1) ? 8'h77 : 8'h7F;
+
 reg bit_clk_en;
 always @(posedge clk32) begin
 	reg [7:0] bit_clk_cnt;
@@ -102,7 +105,7 @@ always @(posedge clk32) begin
 		bit_clk_en <= 0;
 	end else begin
 		bit_clk_en <= 0;
-		if (bit_clk_cnt == 111) begin
+		if (bit_clk_cnt == bit_clk_div) begin
 			bit_clk_en <= 1;
 			bit_clk_cnt = 0;
 		end else

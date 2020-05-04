@@ -256,12 +256,12 @@ begin
 
   -- serial
   serial_srq_in <= '1';
-  serial_clk_in <= not (serial_clk_out_l or iec_clk);
-  serial_data_in <= not (serial_data_out_l or iec_data);
+  serial_clk_in <= not serial_clk_out_l and iec_clk;
+  serial_data_in <= not serial_data_out_l and iec_data;
   serial_atn_in <= not serial_atn_out_l;
-  atn_o <= serial_atn_out_l;
-  clk_o <= serial_clk_out_l;
-  data_o <= serial_data_out_l;
+  atn_o <= not serial_atn_out_l;
+  clk_o <= not serial_clk_out_l;
+  data_o <= not serial_data_out_l;
 
   -- joy
   joy <= i_joy;        -- 0 up, 1 down, 2 left,  3 right

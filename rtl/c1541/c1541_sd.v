@@ -45,10 +45,12 @@ module c1541_sd
 	input   [7:0] sd_buff_dout,
 	output  [7:0] sd_buff_din,
 	input         sd_buff_wr,
+	output        sd_busy,
 
 	input  [13:0] rom_addr,
 	input   [7:0] rom_data,
 	input         rom_wr,
+	input         stdrom_wr,
 	input         rom_std
 );
 
@@ -65,6 +67,7 @@ always @(posedge clk_c1541) begin
 	reset <= reset_r;
 end
 
+reg readonly = 0;
 reg ch_state;
 always @(posedge clk_c1541) begin
 	integer ch_timeout;
@@ -75,13 +78,17 @@ always @(posedge clk_c1541) begin
 		ch_timeout <= ch_timeout - 1;
 		ch_state <= 1;
 	end else ch_state <= 0;
-	if (~prev_change & disk_change) ch_timeout <= 15000000;
+	if (~prev_change & disk_change) begin
+		ch_timeout <= 15000000;
+		readonly <= disk_readonly;
+	end
 end
 
 wire       mode; // read/write
 wire [1:0] stp;
 wire       mtr;
 wire       act;
+wire [1:0] freq;
 
 c1541_logic c1541_logic
 (
@@ -89,9 +96,9 @@ c1541_logic c1541_logic
 	.reset(reset),
 
 	// serial bus
-	.sb_clk_in(~iec_clk_i),
-	.sb_data_in(~iec_data_i),
-	.sb_atn_in(~iec_atn_i),
+	.sb_clk_in(iec_clk_i),
+	.sb_data_in(iec_data_i),
+	.sb_atn_in(iec_atn_i),
 	.sb_clk_out(iec_clk_o),
 	.sb_data_out(iec_data_o),
 
@@ -99,6 +106,7 @@ c1541_logic c1541_logic
 	.c1541rom_addr(rom_addr),
 	.c1541rom_data(rom_data),
 	.c1541rom_wr(rom_wr),
+	.c1541stdrom_wr(stdrom_wr),
 	.c1541std(rom_std),
 
 	// drive-side interface
@@ -108,10 +116,10 @@ c1541_logic c1541_logic
 	.mode(mode),
 	.stp(stp),
 	.mtr(mtr),
-	.freq(),
+	.freq(freq),
 	.sync_n(sync_n),
 	.byte_n(byte_n),
-	.wps_n(~disk_readonly ^ ch_state),
+	.wps_n(~readonly ^ ch_state),
 	.tr00_sense_n(|track),
 	.act(act)
 );
@@ -134,6 +142,7 @@ c1541_gcr c1541_gcr
 	.din(gcr_di),
 	.mode(mode),
 	.mtr(mtr),
+	.freq(freq),
 	.sync_n(sync_n),
 	.byte_n(byte_n),
 
@@ -147,8 +156,6 @@ c1541_gcr c1541_gcr
 
 	.ram_ready(~sd_busy)
 );
-
-wire sd_busy;
 
 c1541_track c1541_track
 (
