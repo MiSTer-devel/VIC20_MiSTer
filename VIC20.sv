@@ -528,9 +528,9 @@ wire v20_iec_atn_o;
 wire v20_iec_data_o;
 wire v20_iec_clk_o;
 
-wire [15:0] audio;
+wire [5:0] audio;
 
-assign AUDIO_L = {1'b0,audio[15:1]} + {cass_aud,10'd0};
+assign AUDIO_L = {1'b0,audio, 9'd0} + {cass_aud,10'd0};
 assign AUDIO_R = AUDIO_L;
 assign AUDIO_MIX = 0;
 assign AUDIO_S = 0;

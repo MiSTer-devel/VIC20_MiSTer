@@ -83,7 +83,7 @@ entity VIC20 is
 		--
 		ps2_key      : in  std_logic_vector(10 downto 0);
 		--
-		o_audio      : out std_logic_vector(15 downto 0); -- runs at SYSCLK/SYSCLK_EN rate
+		o_audio      : out std_logic_vector(5 downto 0);
 
 		cass_write   : out std_logic;
 		cass_read    : in  std_logic;
@@ -324,7 +324,7 @@ begin
       O_DATA          => vic_dout,
       O_DATA_OE_L     => vic_oe_l,
       --
-      O_AUDIO         => vic_audio,
+      O_AUDIO         => O_AUDIO,
 
       O_VIDEO_R       => video_r,
       O_VIDEO_G       => video_g,
@@ -343,61 +343,6 @@ begin
       I_POTX          => '0',
       I_POTY          => '0'
       );
-
-   -- we use a well oversampled LP output...
-   intrinsic_RC_lp: entity work.rc_filter_1o
-    generic map (
-          highpass_g   => false,
-          R_ohms_g     => 1000,    -- 1kOhms   \  LP from output
-          C_p_farads_g => 10000,   -- 10 nF    /  with ~16kHz fg
-          fclk_hz_g => 8867236,    -- we use the sysclk
-          cwidth_g  => 12,
-          dwidthi_g => 6,
-          dwidtho_g => 16
-    )
-    port map (
-          clk_i   => i_sysclk,
-          clken_i => i_sysclk_en,
-          res_i   => reset,
-          din_i   => vic_audio,
-          dout_o  => lp_output
-        );
-
-   audio_RC_lp: entity work.rc_filter_1o
-    generic map (
-          highpass_g   => false,
-          R_ohms_g     => 1000,    -- 1kOhms   \  LP on PCB
-          C_p_farads_g => 100000,  -- 100 nF   /  with ~1.6kHz fg
-          fclk_hz_g => 8867236,    -- we use the sysclk
-          cwidth_g  => 14,
-          dwidthi_g => 16,
-          dwidtho_g => 16
-    )
-    port map (
-          clk_i   => i_sysclk,
-          clken_i => i_sysclk_en,
-          res_i   => reset,
-          din_i   => lp_output,
-          dout_o  => lp_filtered
-        );
-
-   audio_RC_hp: entity work.rc_filter_1o
-    generic map (
-          highpass_g   => true,
-          R_ohms_g     => 1000,      -- 1kOhms   \  HP to connector
-          C_p_farads_g => 1000000,   -- 1 uF     /  with ~160Hz fg
-          fclk_hz_g => 8867236,      -- we use the sysclk
-          cwidth_g  => 16,
-          dwidthi_g => 16,
-          dwidtho_g => 16
-    )
-    port map (
-          clk_i   => i_sysclk,
-          clken_i => i_sysclk_en,
-          res_i   => reset,
-          din_i   => lp_filtered,
-          dout_o  => O_AUDIO
-        );
 
   via1: entity work.via6522
   port map (
@@ -610,7 +555,7 @@ begin
   begin
     -- simplified data read mux
     if (col_ram_sel_l = '0' and p2_h='1') then
-      v_data_read_mux <= "0000" & col_ram_dout;
+      v_data_read_mux <= v_data_read_muxr(7 downto 4) & col_ram_dout;
       v_data_oe_l     <= '0';
     elsif (vic_oe_l = '0') then
       v_data_read_mux <= vic_dout;

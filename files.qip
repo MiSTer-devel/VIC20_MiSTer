@@ -10,7 +10,6 @@ set_global_assignment -name VHDL_FILE rtl/ram_conf_1024x4.vhd
 set_global_assignment -name VHDL_FILE rtl/generic_rom.vhd
 set_global_assignment -name VHDL_FILE rtl/vic20_clocks.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_keyboard.vhd
-set_global_assignment -name VHDL_FILE rtl/rc_filter_1o.vhd
 set_global_assignment -name VHDL_FILE rtl/c1530.vhd
 set_global_assignment -name VHDL_FILE rtl/m6561.vhd
 set_global_assignment -name VHDL_FILE rtl/via6522.vhd
