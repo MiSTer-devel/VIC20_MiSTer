@@ -41,7 +41,7 @@ You won't find the cartridges with CTx extensions. All the cartridges you will f
 
 The best practice is to only use the carts with a header.
 
-Since many cartridges are multi-part cartridges, there is no autostart procedure. You need to load all parts from OSD and if starting address is $A000(SYS 40960) then simply press CTRL+F11 to start. If starting address is different, then follow the instruction of the cartridge. Usually it's SYS <address> command.
+Since many cartridges are multi-part cartridges, there is no autostart procedure. You need to load all parts from OSD and if starting address is $A000(SYS 40960) then simply press CTRL+F11 to start. If starting address is different, then follow the instruction of the cartridge. Usually it's `SYS <address>` command.
 
 RAM expansions aren't universal. Enabling all expansions won't automatically make the VIC-20 compatible with all games. So you need to find the info about that specific game's RAM requirements if it doesn't run. Or try different options.
 
