@@ -80,6 +80,7 @@ entity VIC20 is
 		o_vblank     : out std_logic;
 		i_center     : in  std_logic_vector(1 downto 0);
 		i_pal        : in  std_logic;
+		i_wide       : in  std_logic;
 		--
 		ps2_key      : in  std_logic_vector(10 downto 0);
 		--
@@ -338,6 +339,7 @@ begin
       --
 		I_CENTER        => I_CENTER,
 		I_PAL           => i_pal,
+		I_WIDE          => i_wide,
       --
       I_LIGHT_PEN     => light_pen,
       I_POTX          => '0',

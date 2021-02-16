@@ -53,6 +53,9 @@ module emu
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
 
+	input  [11:0] HDMI_WIDTH,
+	input  [11:0] HDMI_HEIGHT,
+
 `ifdef USE_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
 	// FB_FORMAT:
@@ -182,11 +185,6 @@ assign LED_POWER = 0;
 assign BUTTONS   = 0;
 assign VGA_SCALER= 0;
 
-wire [1:0] ar = status[20:19];
-
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
-
 `include "build_id.v" 
 parameter CONF_STR = {
 	"VIC20;;",
@@ -205,6 +203,8 @@ parameter CONF_STR = {
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
 	"OE,TV mode,PAL,NTSC;",
+	"d1OO,Vertical Crop,No,Yes;",
+	"-;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
 	"O9,ExtRAM 3,Off,$A000(8KB);",
@@ -346,6 +346,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.status_menumask({|vcrop,1'b0}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -508,6 +509,7 @@ VIC20 VIC20
 	.o_vblank(vblank),
 	.i_center(status[13:12]+2'b11),
 	.i_pal(pal),
+	.i_wide(wide),
 
 	.ps2_key(v20_key),
 
@@ -591,6 +593,35 @@ video_cleaner video_cleaner
 	.VBlank_out(VBlank)
 ); 
 
+reg [9:0] vcrop;
+reg wide;
+always @(posedge CLK_VIDEO) begin
+	vcrop <= 0;
+	wide <= 0;
+	if(HDMI_WIDTH >= (HDMI_HEIGHT + HDMI_HEIGHT[11:1])) begin
+		if(HDMI_HEIGHT == 480)  vcrop <= 240;
+		if(HDMI_HEIGHT == 600)  begin vcrop <= 200; wide <= vcrop_en; end
+		if(HDMI_HEIGHT == 720)  vcrop <= 240;
+		if(HDMI_HEIGHT == 768)  vcrop <= 256; // NTSC mode has 245 visible lines only!
+		if(HDMI_HEIGHT == 800)  begin vcrop <= 200; wide <= vcrop_en; end
+		if(HDMI_HEIGHT == 1080) vcrop <= pal ? 10'd270 : 10'd216;
+		if(HDMI_HEIGHT == 1200) vcrop <= 240;
+	end
+end
+
+wire [1:0] ar = status[20:19];
+wire vcrop_en = status[24];
+wire vga_de;
+video_crop video_crop
+(
+	.*,
+	.VGA_DE_IN(vga_de),
+	.ARX((!ar) ? ((wide & pal) ? 12'd330 : (wide & ~pal) ? 12'd390 : 12'd400) : (ar - 1'd1)),
+	.ARY((!ar) ? 12'd300 : 12'd0),
+	.CROP_SIZE(vcrop_en ? vcrop : 10'd0),
+	.CROP_OFF(0)
+);
+
 video_mixer #(256, 1, 1) mixer
 (
 	.*,
@@ -602,7 +633,8 @@ video_mixer #(256, 1, 1) mixer
 	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 
-	.mono(0)
+	.mono(0),
+	.VGA_DE(vga_de)
 );
 
 ///////////////////////////////////////////////////

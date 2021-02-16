@@ -96,6 +96,7 @@ entity M6561 is
 		--
 		I_CENTER          : in    std_logic_vector(1 downto 0);
 		I_PAL             : in    std_logic;
+		I_WIDE            : in    std_logic;
 		--
 		I_LIGHT_PEN       : in    std_logic;
 		I_POTX            : in    std_logic;
@@ -106,20 +107,24 @@ end entity M6561;
 architecture RTL of M6561 is
 
   -- clocks per line must be divisable by 4
-  constant PAL_CLOCKS_PER_LINE_M1  : std_logic_vector(8 downto 0) := "100011011"; -- 284 -1
-  constant PAL_TOTAL_LINES_M1      : std_logic_vector(8 downto 0) := "100110111"; -- 312 -1
-  constant PAL_H_START_M1          : std_logic_vector(8 downto 0) := "000101011"; -- 44 -1
-  constant PAL_H_END_M1            : std_logic_vector(8 downto 0) := "100001111"; -- 272 -1
-  constant PAL_V_START             : std_logic_vector(8 downto 0) := "000011100"; -- 28
-  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := "10000";
+  constant PAL_CLOCKS_PER_LINE_M1  : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(283, 9));
+  constant PAL_TOTAL_LINES_M1      : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(311, 9));
+  constant PAL_H_START_M1          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
+  constant PAL_H_END_M1            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(271, 9));
+  constant PAL_V_START             : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 28, 9));
+  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 13, 5));
+  constant PAL_H_START_OFF         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
+  constant PAL_H_END_OFF           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   -- video size 228 pixels by 284 lines (PAL)
 
-  constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := "100000101"; -- 262 -1
-  constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := "100000100"; -- 261 -1
-  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := "000101011"; -- 44 -1
-  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := "011110111"; -- 248 -1
-  constant NTSC_V_START            : std_logic_vector(8 downto 0) := "000010000"; -- 16
-  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := "11100";
+  constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(261, 9));
+  constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(260, 9));
+  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
+  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(247, 9));
+  constant NTSC_V_START            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 16, 9));
+  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 29, 5));
+  constant NTSC_H_START_OFF        : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
+  constant NTSC_H_END_OFF          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
 
   signal CLOCKS_PER_LINE_M1        : std_logic_vector(8 downto 0);
   signal TOTAL_LINES_M1            : std_logic_vector(8 downto 0);
@@ -127,6 +132,10 @@ architecture RTL of M6561 is
   signal H_END_M1                  : std_logic_vector(8 downto 0);
   signal V_START                   : std_logic_vector(8 downto 0);
   signal K_OFFSET                  : std_logic_vector(4 downto 0);
+  signal H_START_OFF               : std_logic_vector(8 downto 0);
+  signal H_END_OFF                 : std_logic_vector(8 downto 0);
+  signal H_START_M                 : std_logic_vector(8 downto 0);
+  signal H_END_M                   : std_logic_vector(8 downto 0);
 
   -- close to original                               RGB
   constant col0 : std_logic_vector(11 downto 0) := x"000";  -- 0 - 0000   Black
@@ -271,10 +280,15 @@ begin
 
   CLOCKS_PER_LINE_M1 <= PAL_CLOCKS_PER_LINE_M1 when I_PAL = '1' else NTSC_CLOCKS_PER_LINE_M1;
   TOTAL_LINES_M1     <= PAL_TOTAL_LINES_M1     when I_PAL = '1' else NTSC_TOTAL_LINES_M1;
-  H_START_M1         <= PAL_H_START_M1         when I_PAL = '1' else NTSC_H_START_M1;
-  H_END_M1           <= PAL_H_END_M1           when I_PAL = '1' else NTSC_H_END_M1;
+  H_START_M          <= PAL_H_START_M1         when I_PAL = '1' else NTSC_H_START_M1;
+  H_END_M            <= PAL_H_END_M1           when I_PAL = '1' else NTSC_H_END_M1;
   V_START            <= PAL_V_START            when I_PAL = '1' else NTSC_V_START;
   K_OFFSET           <= PAL_K_OFFSET           when I_PAL = '1' else NTSC_K_OFFSET;
+  H_START_OFF        <= PAL_H_START_OFF        when I_PAL = '1' else NTSC_H_START_OFF;
+  H_END_OFF          <= PAL_H_END_OFF          when I_PAL = '1' else NTSC_H_END_OFF;
+
+  H_START_M1         <= H_START_M when I_WIDE = '0' else (H_START_M + H_START_OFF);
+  H_END_M1           <= H_END_M   when I_WIDE = '0' else (H_END_M - H_END_OFF);
 
   -- clocking
   p2_h_int     <= not hcnt(1);
