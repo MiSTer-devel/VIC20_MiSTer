@@ -40,8 +40,9 @@ module emu
 	output        CE_PIXEL,
 
 	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	output [11:0] VIDEO_ARX,
-	output [11:0] VIDEO_ARY,
+	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
+	output [12:0] VIDEO_ARX,
+	output [12:0] VIDEO_ARY,
 
 	output  [7:0] VGA_R,
 	output  [7:0] VGA_G,
@@ -203,7 +204,9 @@ parameter CONF_STR = {
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
 	"OE,TV mode,PAL,NTSC;",
+	"-;",
 	"d1OO,Vertical Crop,No,Yes;",
+	"OPQ,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
@@ -598,7 +601,7 @@ reg wide;
 always @(posedge CLK_VIDEO) begin
 	vcrop <= 0;
 	wide <= 0;
-	if(HDMI_WIDTH >= (HDMI_HEIGHT + HDMI_HEIGHT[11:1])) begin
+	if(HDMI_WIDTH >= (HDMI_HEIGHT + HDMI_HEIGHT[11:1]) && !forced_scandoubler && !scale) begin
 		if(HDMI_HEIGHT == 480)  vcrop <= 240;
 		if(HDMI_HEIGHT == 600)  begin vcrop <= 200; wide <= vcrop_en; end
 		if(HDMI_HEIGHT == 720)  vcrop <= 240;
@@ -612,28 +615,22 @@ end
 wire [1:0] ar = status[20:19];
 wire vcrop_en = status[24];
 wire vga_de;
-video_crop video_crop
+video_freak video_freak
 (
 	.*,
 	.VGA_DE_IN(vga_de),
 	.ARX((!ar) ? ((wide & pal) ? 12'd330 : (wide & ~pal) ? 12'd390 : 12'd400) : (ar - 1'd1)),
 	.ARY((!ar) ? 12'd300 : 12'd0),
 	.CROP_SIZE(vcrop_en ? vcrop : 10'd0),
-	.CROP_OFF(0)
+	.CROP_OFF(0),
+	.SCALE(status[26:25])
 );
 
 video_mixer #(256, 1, 1) mixer
 (
 	.*,
-
-	.clk_vid(CLK_VIDEO),
-	.ce_pix_out(CE_PIXEL),
-
 	.hq2x(scale == 1),
-	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
-
-	.mono(0),
 	.VGA_DE(vga_de)
 );
 
