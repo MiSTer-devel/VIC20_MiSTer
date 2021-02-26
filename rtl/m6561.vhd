@@ -112,7 +112,7 @@ architecture RTL of M6561 is
   constant PAL_H_START_M1          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
   constant PAL_H_END_M1            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(271, 9));
   constant PAL_V_START             : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 28, 9));
-  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 13, 5));
+  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 16, 5));
   constant PAL_H_START_OFF         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   constant PAL_H_END_OFF           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   -- video size 228 pixels by 284 lines (PAL)
@@ -122,7 +122,7 @@ architecture RTL of M6561 is
   constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
   constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(247, 9));
   constant NTSC_V_START            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 16, 9));
-  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 29, 5));
+  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 28, 5));
   constant NTSC_H_START_OFF        : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
   constant NTSC_H_END_OFF          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
 
