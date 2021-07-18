@@ -190,7 +190,7 @@ assign HDMI_FREEZE = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXX XXXX XXXXXXXXXXX XXXX
+// X XXX XXXX XXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 parameter CONF_STR = {
@@ -203,6 +203,7 @@ parameter CONF_STR = {
 	"h3RG,Tape Play/Pause;",
 	"h3RI,Tape Unload;",
 	"h3OH,Tape Sound,Off,On;",
+	"h3OM,Tape Autoplay,Yes,No;",
 	"h3-;",
 	"OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
@@ -532,12 +533,13 @@ VIC20 VIC20
 	.i_wide(wide),
 
 	.ps2_key(v20_key),
+	.tape_play(key_play),
 
 	.o_audio(audio),
 
-	.cass_read(cass_do),
+	.cass_read(tape_adc_act ? ~tape_adc : cass_read),
 	.cass_motor(cass_motor),
-	.cass_sw(~tap_play),
+	.cass_sw(cass_sense),
 
 	.rom_std(rom_std),
 	.conf_clk(clk_sys),
@@ -748,6 +750,7 @@ ddram ddram
 );
 
 reg tap_wr;
+reg [1:0] tap_version;
 always @(posedge clk_sys) begin
 	reg old_reset;
 
@@ -758,6 +761,7 @@ always @(posedge clk_sys) begin
 	if(ioctl_wr & load_tap) begin
 		ioctl_wait <= 1;
 		tap_wr <= 1;
+		if (ioctl_addr == 'h0C) tap_version <= ioctl_dout[1:0];
 	end
 	else if(~tap_wr & ioctl_wait & tap_data_ready) begin
 		ioctl_wait <= 0;
@@ -770,34 +774,29 @@ reg [24:0] tap_play_addr;
 reg [24:0] tap_last_addr;
 wire [7:0] tap_data;
 wire       tap_data_ready;
-wire       tap_reset = reset | (ioctl_download & load_tap) | status[18] | (cass_motor & ((tap_last_addr - tap_play_addr) < 80));
+wire       tap_reset = reset | (ioctl_download & load_tap) | status[18] | tap_finish | (cass_run & ((tap_last_addr - tap_play_addr) < 80));
 reg        tap_wrreq;
 wire       tap_wrfull;
 wire       tap_loaded = (tap_play_addr < tap_last_addr);
-reg        tap_play;
-wire       tap_play_btn = status[16];
+wire       cass_sense;
+wire       key_play;
+reg        tap_autoplay = 0;
 
 always @(posedge clk_sys) begin
-	reg tap_play_btnD, tap_finishD;
 	reg tap_cycle = 0;
-
-	tap_play_btnD <= tap_play_btn;
-	tap_finishD <= tap_finish;
 
 	if(tap_reset) begin
 		//C1530 module requires one more byte at the end due to fifo early check.
 		tap_last_addr <= (ioctl_download & load_tap) ? ioctl_addr+2'd2 : 25'd0;
 		tap_play_addr <= 0;
-		tap_play <= (ioctl_download & load_tap);
 		tap_rd <= 0;
 		tap_cycle <= 0;
+		tap_autoplay <= ioctl_download & load_tap & ~status[22];
 	end
 	else begin
-		if (~tap_play_btnD & tap_play_btn) tap_play <= ~tap_play;
-		if (~tap_finishD & tap_finish) tap_play <= 0;
-
 		tap_rd <= 0;
 		tap_wrreq <= 0;
+		tap_autoplay <= 0;
 
 		if(~tap_rd & ~tap_wrreq) begin
 			if(tap_cycle) begin
@@ -818,28 +817,42 @@ always @(posedge clk_sys) begin
 end
 
 reg [26:0] act_cnt;
-always @(posedge clk_sys) act_cnt <= act_cnt + (tap_play ? 4'd8 : 4'd1);
-wire tape_led = tap_loaded && (act_cnt[26] ? (~(tap_play & cass_motor) && act_cnt[25:18] > act_cnt[7:0]) : act_cnt[25:18] <= act_cnt[7:0]);
+always @(posedge clk_sys) act_cnt <= act_cnt + (cass_sense ? 4'd1 : 4'd8);
+wire tape_led = tap_loaded && (act_cnt[26] ? ((cass_sense | ~cass_motor) && act_cnt[25:18] > act_cnt[7:0]) : act_cnt[25:18] <= act_cnt[7:0]);
 
 wire cass_motor;
-wire cass_do;
-wire cass_aud = cass_do & status[17] & tap_play & ~cass_motor;
+wire cass_run;
+wire cass_read;
+wire cass_aud = cass_read & status[17] & ~cass_sense & ~cass_motor;
 
 c1530 c1530
 (
-	.clk(clk_sys),
-	.restart(tap_reset),
+	.clk32(clk_sys),
+	.restart_tape(tap_reset),
+	
+	.wav_mode(0),
+	.tap_version(tap_version),
 
-	.clk_freq(35468944),
-	.cpu_freq(985249), // it seems this value works better than original.
+	.host_tap_in(tap_data),
+	.host_tap_wrreq(tap_wrreq),
+	.tap_fifo_wrfull(tap_wrfull),
+	.tap_fifo_error(tap_finish),
 
-	.din(tap_data),
-	.wr(tap_wrreq),
-	.full(tap_wrfull),
-	.empty(tap_finish),
+	.osd_play_stop_toggle(status[16]|key_play|tap_autoplay),
+	.cass_motor(cass_motor),
+	.cass_sense(cass_sense),
+	.cass_read(cass_read),
+	.cass_run(cass_run),
+	.ear_input(0)
+);
 
-	.play(~cass_motor & tap_play),
-	.dout(cass_do)
+wire tape_adc, tape_adc_act;
+ltc2308_tape #(.CLK_RATE(35468944)) ltc2308_tape
+(
+  .clk(clk_sys),
+  .ADC_BUS(ADC_BUS),
+  .dout(tape_adc),
+  .active(tape_adc_act)
 );
 
 endmodule
