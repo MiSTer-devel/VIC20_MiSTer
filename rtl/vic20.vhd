@@ -83,6 +83,7 @@ entity VIC20 is
 		i_wide       : in  std_logic;
 		--
 		ps2_key      : in  std_logic_vector(10 downto 0);
+		tape_play    : out std_logic;
 		--
 		o_audio      : out std_logic_vector(5 downto 0);
 
@@ -426,7 +427,8 @@ begin
 
   keyboard : work.fpga64_keyboard
   port map (
-     clk => I_SYSCLK,
+     clk     => I_SYSCLK,
+	  reset   => '0',
      ps2_key => ps2_key,
 
      pai(7)          => keybd_row_out_s(0),
@@ -447,9 +449,10 @@ begin
 	  pbo(3)          => keybd_col_in(7),
 	  pbo(2 downto 0) => keybd_col_in(2 downto 0),
 
-     reset_key => reset_key,
+     reset_key   => reset_key,
      restore_key => keybd_restore,
-     
+	  tape_play   => tape_play,
+
      backwardsReadingEnabled => '1'
   );
   
