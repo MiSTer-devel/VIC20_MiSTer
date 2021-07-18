@@ -1,4 +1,4 @@
-set_global_assignment -name QIP_FILE rtl/c1541/c1541.qip
+set_global_assignment -name QIP_FILE rtl/iec_drive/iec_drive.qip
 set_global_assignment -name QIP_FILE rtl/t65/t65.qip
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/ddram.sv
 set_global_assignment -name VHDL_FILE rtl/gen_rom.vhd

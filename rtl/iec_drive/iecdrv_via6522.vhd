@@ -16,7 +16,7 @@ use ieee.std_logic_1164.all;
 use ieee.std_logic_arith.all;
 use ieee.std_logic_unsigned.all;
 
-entity c1541_via6522 is
+entity iecdrv_via6522 is
 port (
     clock       : in  std_logic;
     rising      : in  std_logic;
@@ -59,7 +59,7 @@ port (
     
 end entity;
 
-architecture Gideon of c1541_via6522 is
+architecture Gideon of iecdrv_via6522 is
 
     type pio_t is
     record
@@ -379,7 +379,7 @@ begin
             when X"D" => -- IFR
                 data_out  <= irq_out & irq_flags;
             when X"E" => -- IER
-                data_out  <= '0' & irq_mask;
+                data_out  <= '1' & irq_mask;
             when X"F" => -- ORA
                 data_out  <= ira;
             when others =>

@@ -174,26 +174,33 @@ module emu
 );
 
 assign ADC_BUS  = 'Z;
-assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
  
-assign LED_USER  = ioctl_download | led_disk | tape_led;
+assign LED_USER  = ioctl_download | |led_disk | tape_led;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
 assign VGA_SCALER= 0;
 assign HDMI_FREEZE = 0;
 
+// Status Bit Map:
+//              Upper                          Lower
+// 0         1         2         3          4         5         6
+// 01234567890123456789012345678901 23456789012345678901234567890123
+// 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
+// X XXX XXXX XXXXXXXXXXX XXXX
+
 `include "build_id.v" 
 parameter CONF_STR = {
 	"VIC20;;",
+	"S0,D64G64,Mount #8;",
+	"S1,D64G64,Mount #9;",
 	"-;",
 	"F1,PRG;",
 	"F2,CRT,Load Cart;",
 	"F3,CT?,Load Cart;",
-	"S0,D64;",
 	"-;",
 	"F5,TAP,Tape Load;",
 	"RG,Tape Play/Pause;",
@@ -204,11 +211,11 @@ parameter CONF_STR = {
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
 	"OE,TV mode,PAL,NTSC;",
-	"-;",
 	"H2d1ON,Vertical Crop,No,Yes;",
 	"h2d1ONO,Vertical Crop,No,270,216;",
 	"OPQ,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
+	"OL,External IEC,Disabled,Enabled;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
 	"O9,ExtRAM 3,Off,$A000(8KB);",
@@ -328,20 +335,22 @@ wire  [7:0] ioctl_dout;
 wire [31:0] ioctl_file_ext;
 wire        forced_scandoubler;
 
-wire [31:0] sd_lba[1];
-wire        sd_rd;
-wire        sd_wr;
-wire        sd_ack;
+wire [31:0] sd_lba[2];
+wire  [5:0] sd_blk_cnt[2];
+wire  [1:0] sd_rd;
+wire  [1:0] sd_wr;
+wire  [1:0] sd_ack;
 wire [13:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din[1];
+wire  [7:0] sd_buff_din[2];
 wire        sd_buff_wr;
-wire        img_mounted;
+wire  [1:0] img_mounted;
 wire        img_readonly;
+wire [31:0] img_size;
 
 wire [21:0] gamma_bus;
 
-hps_io #(.CONF_STR(CONF_STR)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .BLKSZ(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -363,6 +372,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_wait(ioctl_wait),
 
 	.sd_lba(sd_lba),
+	.sd_blk_cnt(sd_blk_cnt),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
@@ -372,6 +382,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.sd_buff_wr(sd_buff_wr),
 	.img_mounted(img_mounted),
 	.img_readonly(img_readonly),
+	.img_size(img_size),
 
 	.joystick_0(joya),
 	.joystick_1(joyb)
@@ -492,8 +503,8 @@ VIC20 VIC20
 	.atn_o(v20_iec_atn_o),
 	.clk_o(v20_iec_clk_o),
 	.data_o(v20_iec_data_o),
-	.clk_i(c1541_iec_clk_o),
-	.data_i(c1541_iec_data_o),
+	.clk_i(c1541_iec_clk_o & ext_iec_clk),
+	.data_i(c1541_iec_data_o & ext_iec_data),
 
 	.i_joy(~{joy[0],joy[1],joy[2],joy[3]}),
 	.i_fire(~joy[4]),
@@ -639,42 +650,54 @@ video_mixer #(256, 1, 1) mixer
 
 ///////////////////////////////////////////////////
 
-wire led_disk;
+wire [1:0] led_disk;
 
 wire c1541_iec_data_o;
 wire c1541_iec_clk_o;
 
-c1541_sd c1541_sd
+c1541_multi #(.PARPORT(0)) c1541
 (
-	.clk_c1541(clk_sys & ce_c1541),
+	.clk(clk_sys),
+	.reset({reset|tv_reset | ~drive_mounted[1], reset|tv_reset | ~drive_mounted[0]}),
+	.ce(ce_c1541),
+
+	.img_mounted(img_mounted),
+	.img_readonly(img_readonly),
+	.img_size(img_size),
+
+	.gcr_mode(2'b11),
+
+	.led(led_disk),
+
+	.iec_atn_i(v20_iec_atn_o),
+	.iec_data_i(v20_iec_data_o & ext_iec_data),
+	.iec_clk_i(v20_iec_clk_o & ext_iec_clk),
+	.iec_data_o(c1541_iec_data_o),
+	.iec_clk_o(c1541_iec_clk_o),
+
 	.clk_sys(clk_sys),
 
-	.rom_addr(ioctl_addr[13:0]),
-	.rom_data(ioctl_dout),
-	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
-	.rom_std(rom_std),
-
-   .disk_change(img_mounted ),
-	.disk_readonly(img_readonly ),
-
-	.iec_reset_i( reset|tv_reset ),
-	.iec_atn_i  ( v20_iec_atn_o  ),
-	.iec_data_i ( v20_iec_data_o ),
-	.iec_clk_i  ( v20_iec_clk_o  ),
-	.iec_data_o ( c1541_iec_data_o ),
-	.iec_clk_o  ( c1541_iec_clk_o  ),
-
-   .led(led_disk),
-
-	.sd_lba(sd_lba[0]),
+	.sd_lba(sd_lba),
+	.sd_blk_cnt(sd_blk_cnt),
 	.sd_rd(sd_rd),
 	.sd_wr(sd_wr),
 	.sd_ack(sd_ack),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din[0]),
-	.sd_buff_wr(sd_buff_wr)
+	.sd_buff_din(sd_buff_din),
+	.sd_buff_wr(sd_buff_wr),
+	
+	.rom_addr(ioctl_addr[13:0]),
+	.rom_data(ioctl_dout),
+	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
+	.rom_std(rom_std)
 );
+
+reg [1:0] drive_mounted = 0;
+always @(posedge clk_sys) begin 
+	if(img_mounted[0]) drive_mounted[0] <= |img_size;
+	if(img_mounted[1]) drive_mounted[1] <= |img_size;
+end
 
 reg ce_c1541;
 always @(negedge clk_sys) begin
@@ -684,12 +707,24 @@ always @(negedge clk_sys) begin
 	msum <= pal ? 35468944 : 32727260;
 
 	ce_c1541 <= 0;
-	sum = sum + 32000000;
+	sum = sum + 16000000;
 	if(sum >= msum) begin
 		sum = sum - msum;
 		ce_c1541 <= 1;
 	end
-end 
+end
+
+wire ext_iec_en   = status[21];
+wire ext_iec_clk  = USER_IN[2] | ~ext_iec_en;
+wire ext_iec_data = USER_IN[4] | ~ext_iec_en;
+
+assign USER_OUT[0] = 1;
+assign USER_OUT[1] = 1;
+assign USER_OUT[2] = (v20_iec_clk_o & c1541_iec_clk_o)  | ~ext_iec_en;
+assign USER_OUT[3] = ~(reset|tv_reset) | ~ext_iec_en;
+assign USER_OUT[4] = (v20_iec_data_o & c1541_iec_data_o) | ~ext_iec_en;
+assign USER_OUT[5] = v20_iec_atn_o | ~ext_iec_en;
+assign USER_OUT[6] = 1;
 
 /////////////////////////////////////////////////
 
