@@ -198,15 +198,12 @@ parameter CONF_STR = {
 	"S0,D64G64,Mount #8;",
 	"S1,D64G64,Mount #9;",
 	"-;",
-	"F1,PRG;",
-	"F2,CRT,Load Cart;",
-	"F3,CT?,Load Cart;",
+	"F1,PRGCRTCT?TAP,Load;",
 	"-;",
-	"F5,TAP,Tape Load;",
-	"RG,Tape Play/Pause;",
-	"RI,Tape Unload;",
-	"OH,Tape Sound,Off,On;",
-	"-;",
+	"h3RG,Tape Play/Pause;",
+	"h3RI,Tape Unload;",
+	"h3OH,Tape Sound,Off,On;",
+	"h3-;",
 	"OJK,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O24,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"OCD,Screen center,Both,None,Horz,Vert;",
@@ -215,12 +212,16 @@ parameter CONF_STR = {
 	"h2d1ONO,Vertical Crop,No,270,216;",
 	"OPQ,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-	"OL,External IEC,Disabled,Enabled;",
 	"O6,ExtRAM 1,Off,$0400(3KB);",
 	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
 	"O9,ExtRAM 3,Off,$A000(8KB);",
+	"-;",
+	"OL,External IEC,Disabled,Enabled;",
 	"OB,Cart is writable,No,Yes;", 
+	"-;",
 	"OF,Kernal,Loadable,Standard;",
+	"FC6,ROM,Load Kernal;",
+	"-;",
 	"R0,Reset;",
 	"J,Fire;",
 	"V,v",`BUILD_DATE
@@ -238,6 +239,12 @@ always_comb begin
 		3: extram2 <= 7;
 	endcase
 end
+
+wire load_prg = (ioctl_index == 'h01);
+wire load_crt = (ioctl_index == 'h41);
+wire load_ct  = (ioctl_index == 'h81);
+wire load_tap = (ioctl_index == 'hC1);
+wire load_rom = (ioctl_index == 'h06);
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -357,7 +364,7 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .BLKSZ(1)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({en1080p,|vcrop,1'b0}),
+	.status_menumask({tap_loaded,en1080p,|vcrop,1'b0}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -409,7 +416,7 @@ always @(posedge clk_sys) begin
 	dl_wr <= 0;
 	old_download <= ioctl_download;
 
-	if(ioctl_download && (ioctl_index == 1)) begin
+	if(ioctl_download && load_prg) begin
 		state <= 0;
 		if(ioctl_wr) begin
 			     if(ioctl_addr == 0) addr[7:0]  <= ioctl_dout;
@@ -425,7 +432,7 @@ always @(posedge clk_sys) begin
 		end
 	end
 
-	if(old_download && ~ioctl_download && (ioctl_index == 1)) state <= 1;
+	if(old_download && ~ioctl_download && load_prg) state <= 1;
 	if(state) state <= state + 1'd1;
 
 	case(state)
@@ -439,7 +446,7 @@ always @(posedge clk_sys) begin
 		15: begin dl_addr <= 16'haf; dl_data <= addr[15:8]; dl_wr <= 1; end
 	endcase
 
-	if(ioctl_download && !ioctl_index) begin
+	if(ioctl_download && load_rom) begin
 		state <= 0;
 		if(ioctl_wr) begin
 			if(ioctl_addr>='h4000 && ioctl_addr<'h8000) begin
@@ -450,10 +457,10 @@ always @(posedge clk_sys) begin
 		end
 	end
 
-	if(ioctl_download && (ioctl_index[4:1] == 1)) begin
+	if(ioctl_download && (load_crt || load_ct)) begin
 		if(ioctl_wr) begin
-				  if(ioctl_addr == 0 && ioctl_index == 2) addr[7:0]  <= ioctl_dout;
-			else if(ioctl_addr == 1 && ioctl_index == 2) addr[15:8] <= ioctl_dout;
+				  if(ioctl_addr == 0 && load_crt) addr[7:0]  <= ioctl_dout;
+			else if(ioctl_addr == 1 && load_crt) addr[15:8] <= ioctl_dout;
 			else if(addr < 'hC000) begin
 				if(addr[15:13] == 3'b000) cart_blk[0] <= 1;
 				if(addr[15:13] == 3'b001) cart_blk[1] <= 1;
@@ -468,10 +475,10 @@ always @(posedge clk_sys) begin
 		end
 	end
 
-	if(old_download && ~ioctl_download && (ioctl_index[4:0] == 2)) cart_reset <= 0;
+	if(old_download && ~ioctl_download && load_crt) cart_reset <= 0;
 	if(sys_reset) {cart_reset, cart_blk} <= 0;
 
-	if(~old_download & ioctl_download & (ioctl_index[4:0] == 3)) begin
+	if(~old_download & ioctl_download & load_ct) begin
 		if(ioctl_file_ext[7:0] >= "2" && ioctl_file_ext[7:0] <= "9") addr <= {ioctl_file_ext[3:0],     12'h000};
 		if(ioctl_file_ext[7:0] >= "A" && ioctl_file_ext[7:0] <= "B") addr <= {ioctl_file_ext[3:0]+4'd9,12'h000};
 	end
@@ -689,7 +696,7 @@ c1541_multi #(.PARPORT(0)) c1541
 	
 	.rom_addr(ioctl_addr[13:0]),
 	.rom_data(ioctl_dout),
-	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && !ioctl_index),
+	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && load_rom),
 	.rom_std(rom_std)
 );
 
@@ -732,7 +739,7 @@ assign DDRAM_CLK = clk_sys;
 ddram ddram
 (
 	.*,
-	.addr((ioctl_download & tap_load) ? ioctl_addr : tap_play_addr),
+	.addr((ioctl_download & load_tap) ? ioctl_addr : tap_play_addr),
 	.dout(tap_data),
 	.din(ioctl_dout),
 	.we(tap_wr),
@@ -748,7 +755,7 @@ always @(posedge clk_sys) begin
 	if(~old_reset && reset) ioctl_wait <= 0;
 
 	tap_wr <= 0;
-	if(ioctl_wr & tap_load) begin
+	if(ioctl_wr & load_tap) begin
 		ioctl_wait <= 1;
 		tap_wr <= 1;
 	end
@@ -763,13 +770,12 @@ reg [24:0] tap_play_addr;
 reg [24:0] tap_last_addr;
 wire [7:0] tap_data;
 wire       tap_data_ready;
-wire       tap_reset = reset | (ioctl_download & tap_load) | status[18] | (cass_motor & ((tap_last_addr - tap_play_addr) < 80));
+wire       tap_reset = reset | (ioctl_download & load_tap) | status[18] | (cass_motor & ((tap_last_addr - tap_play_addr) < 80));
 reg        tap_wrreq;
 wire       tap_wrfull;
 wire       tap_loaded = (tap_play_addr < tap_last_addr);
 reg        tap_play;
 wire       tap_play_btn = status[16];
-wire       tap_load = (ioctl_index == 5);
 
 always @(posedge clk_sys) begin
 	reg tap_play_btnD, tap_finishD;
@@ -780,9 +786,9 @@ always @(posedge clk_sys) begin
 
 	if(tap_reset) begin
 		//C1530 module requires one more byte at the end due to fifo early check.
-		tap_last_addr <= (ioctl_download & tap_load) ? ioctl_addr+2'd2 : 25'd0;
+		tap_last_addr <= (ioctl_download & load_tap) ? ioctl_addr+2'd2 : 25'd0;
 		tap_play_addr <= 0;
-		tap_play <= (ioctl_download & tap_load);
+		tap_play <= (ioctl_download & load_tap);
 		tap_rd <= 0;
 		tap_cycle <= 0;
 	end
