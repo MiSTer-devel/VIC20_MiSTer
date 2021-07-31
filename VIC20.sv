@@ -173,7 +173,6 @@ module emu
 	input         OSD_STATUS
 );
 
-assign ADC_BUS  = 'Z;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
@@ -539,7 +538,7 @@ VIC20 VIC20
 
 	.cass_read(tape_adc_act ? ~tape_adc : cass_read),
 	.cass_motor(cass_motor),
-	.cass_sw(cass_sense),
+	.cass_sw(~tape_adc_act & cass_sense),
 
 	.rom_std(rom_std),
 	.conf_clk(clk_sys),
