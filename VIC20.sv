@@ -191,7 +191,7 @@ assign HDMI_FREEZE = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXX XXXX XXXXXXXXXXXXXXXX
+// X XXX XXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 parameter CONF_STR = {
@@ -214,9 +214,11 @@ parameter CONF_STR = {
 	"h2d1ONO,Vertical Crop,No,270,216;",
 	"OPQ,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-	"O6,ExtRAM 1,Off,$0400(3KB);",
-	"O78,ExtRAM 2,Off,$2000-$3FFF(8KB),$2000-$5FFF(16KB),$2000-$7FFF(24KB);",
-	"O9,ExtRAM 3,Off,$A000(8KB);",
+	"O6,ExtRAM $0400(3KB),Off,On;",
+	"O7,ExtRAM $2000(8KB),Off,On;",
+	"O8,ExtRAM $4000(8KB),Off,On;",
+	"O9,ExtRAM $6000(8KB),Off,On;",
+	"OA,ExtRAM $A000(8KB),Off,On;",
 	"-;",
 	"OL,External IEC,Disabled,Enabled;",
 	"OB,Cart is writable,No,Yes;", 
@@ -229,18 +231,7 @@ parameter CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
-wire      extram1 = status[6];
-reg [2:0] extram2;
-wire      extram3 = status[9];
-
-always_comb begin
-	case(status[8:7])
-		0: extram2 <= 0;
-		1: extram2 <= 1;
-		2: extram2 <= 3;
-		3: extram2 <= 7;
-	endcase
-end
+wire [4:0] extram = {status[10:6]};
 
 wire load_prg = (ioctl_index == 'h01);
 wire load_crt = (ioctl_index == 'h41);
@@ -519,7 +510,7 @@ VIC20 VIC20
 	.i_fire(~joy[4]),
 
 	.i_ram_ext_ro(cart_blk & ~{5{status[11]}}),
-	.i_ram_ext({extram3,extram2,extram1}|cart_blk),
+	.i_ram_ext(extram|cart_blk),
 
 	.o_ce_pix(i_ce_pix),
 	.o_video_r(r),
