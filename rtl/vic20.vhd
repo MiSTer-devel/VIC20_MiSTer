@@ -57,6 +57,8 @@ entity VIC20 is
 		i_sysclk     : in  std_logic;  -- comes from CLK_A via DCM (divided by 4)
 		i_sysclk_en  : in  std_logic;  -- 8.867236 MHz enable signal
 		i_reset      : in  std_logic;
+		o_p2h        : out std_logic;
+
 		-- serial bus pins
 		atn_o        : out std_logic; -- open drain
 		clk_o        : out std_logic; -- open drain
@@ -69,6 +71,18 @@ entity VIC20 is
 		--
 		i_ram_ext_ro : in  std_logic_vector(4 downto 0); -- read-only region if set
 		i_ram_ext    : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
+		--
+		i_extmem_en  : in  std_logic;
+		o_extmem_sel : out std_logic;
+		o_extmem_r_wn: out std_logic;
+		o_extmem_addr: out std_logic_vector(15 downto 0);
+		i_extmem_data: in  std_logic_vector(7 downto 0);
+		o_extmem_data: out std_logic_vector(7 downto 0);
+		o_io2_sel    : out std_logic;
+		o_io3_sel    : out std_logic;
+		o_blk123_sel : out std_logic;
+		o_blk5_sel   : out std_logic;
+		o_ram123_sel : out std_logic;
 		--
 		o_ce_pix     : out std_logic;
 		o_video_r    : out std_logic_vector(3 downto 0);
@@ -172,6 +186,7 @@ signal ntsc_rom_dout_o    : std_logic_vector(7 downto 0);
 signal expansion_din      : std_logic_vector(7 downto 0);
 signal expansion_nmi_l    : std_logic;
 signal expansion_irq_l    : std_logic;
+signal extmem             : std_logic;
 
 -- VIAs
 signal via1_nmi           : std_logic;
@@ -227,6 +242,8 @@ signal iec_clk            : std_logic;
 signal motor              : std_logic;
 
 begin
+
+	o_p2h <= p2_h;
 
 	process (i_sysclk) begin
 		if rising_edge(i_sysclk) then
@@ -491,7 +508,7 @@ begin
     end if;
   end process;
 
-  p_blk_addr_decode : process(c_addr)
+  p_blk_addr_decode : process(c_addr, blk_sel_l)
   begin
     blk_sel_l <= "11111111";
     case c_addr(15 downto 13) is
@@ -505,6 +522,8 @@ begin
       when "111" => blk_sel_l <= "01111111"; -- kernal    ($E000...)
       when others => null;
     end case;
+	 o_blk123_sel<=(not c_addr(15)) and (c_addr(14) or c_addr(13));
+	 o_blk5_sel<=not blk_sel_l(5);
   end process;
 
   p_v_mux : process(c_addr, c_dout, c_rw_l, p2_h, vic_addr, v_data_read_mux,
@@ -524,7 +543,7 @@ begin
     end if;
   end process;
 
-  p_ram_addr_decode : process(v_addr, blk_sel_l, p2_h)
+  p_ram_addr_decode : process(v_addr, blk_sel_l, p2_h, ram_sel_l)
   begin
     ram_sel_l <= "11111111";
     if ((p2_h = '1') and (blk_sel_l(0) = '0')) or -- cpu
@@ -541,6 +560,7 @@ begin
         when others => null;
       end case;
     end if;
+	 o_ram123_sel<=not (ram_sel_l(1) and ram_sel_l(2) and ram_sel_l(3));
   end process;
 
   p_vic_din_mux : process(p2_h, col_ram_dout, v_data)
@@ -601,7 +621,7 @@ begin
 
   p_cpu_read_mux : process(p2_h, c_addr, io_sel_l, ram_sel_l, blk_sel_l,
                            v_data_read_mux, via1_dout, via2_dout, v_data_oe_l,
-                           basic_rom_dout, i_pal, pal_rom_dout_dl, ntsc_rom_dout_dl, pal_rom_dout_o, ntsc_rom_dout_o, expansion_din,
+                           basic_rom_dout, i_pal, pal_rom_dout_dl, ntsc_rom_dout_dl, pal_rom_dout_o, ntsc_rom_dout_o, i_extmem_data, extmem, i_extmem_en,
 									I_RAM_EXT, ramex0_dout, ramex1_dout, ramex2_dout, ramex3_dout, cart_dout)
   begin
 
@@ -619,6 +639,10 @@ begin
       c_din <= ntsc_rom_dout_dl and ntsc_rom_dout_o;
     elsif (v_data_oe_l = '0') then
       c_din <= v_data_read_mux;
+    elsif (extmem = '1') then
+      c_din <= i_extmem_data;
+    elsif (i_extmem_en = '1') then
+      c_din <= x"FF";
     elsif (ram_sel_l(1) and ram_sel_l(2) and ram_sel_l(3))='0' and I_RAM_EXT(0)='1' then
       c_din <= ramex0_dout;
     elsif blk_sel_l(1)='0' and I_RAM_EXT(1)='1' then
@@ -633,6 +657,28 @@ begin
       c_din <= x"FF";
     end if;
   end process;
+  
+  --
+  -- extension memory - connected to external dram controller
+  --
+  -- at $C000-$FFFF according to I_EXTERNAL_ROM
+  -- at $6000(8k),$4000(8k),$2000(8k),$0400(3k) according to I_RAM_EXT
+  -- at $A000(8k) according to I_CART_EN
+  extmem        <= i_extmem_en when (ram_sel_l(1) and ram_sel_l(2) and ram_sel_l(3))='0' and I_RAM_EXT(0)='1' else
+                   i_extmem_en when blk_sel_l(1)='0' and I_RAM_EXT(1)='1' else
+                   i_extmem_en when blk_sel_l(2)='0' and I_RAM_EXT(2)='1' else
+                   i_extmem_en when blk_sel_l(3)='0' and I_RAM_EXT(3)='1' else
+                   i_extmem_en when blk_sel_l(5)='0' and I_RAM_EXT(4)='1' else
+                   i_extmem_en when io_sel_l(2)='0' else
+                   i_extmem_en when io_sel_l(3)='0' else
+                   '0';
+  o_extmem_sel  <= extmem and p2_h;
+  o_extmem_r_wn <= c_rw_l or not blk_sel_l(6) or not blk_sel_l(7) or ( not(blk_sel_l(5)) and i_ram_ext_ro(4) ); -- disable write if we emulate a ROM on $A000
+  o_extmem_addr <= c_addr(15 downto 0);
+  o_extmem_data <= c_dout;
+  o_io2_sel <= not io_sel_l(2);
+  o_io3_sel <= not io_sel_l(3);
+  
   --
   -- main memory
   --

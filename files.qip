@@ -8,6 +8,8 @@ set_global_assignment -name VHDL_FILE rtl/ram_conf_2048x8.vhd
 set_global_assignment -name VHDL_FILE rtl/ram_conf_1024x8.vhd
 set_global_assignment -name VHDL_FILE rtl/ram_conf_1024x4.vhd
 set_global_assignment -name VHDL_FILE rtl/generic_rom.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/sdram.sv
+set_global_assignment -name VERILOG_FILE rtl/megacart.v
 set_global_assignment -name VHDL_FILE rtl/vic20_clocks.vhd
 set_global_assignment -name VHDL_FILE rtl/fpga64_keyboard.vhd
 set_global_assignment -name VHDL_FILE rtl/c1530.vhd

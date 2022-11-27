@@ -176,9 +176,8 @@ module emu
 
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
  
-assign LED_USER  = ioctl_download | |led_disk | tape_led;
+assign LED_USER  = ioctl_download | |led_disk | tape_led | mc_nvram_dirty;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = 0;
@@ -186,20 +185,24 @@ assign VGA_SCALER= 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 
+
 // Status Bit Map:
 //              Upper                          Lower
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXX XXXXXXXXXXXXXXXXXXXXX
+// X XXX XXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 parameter CONF_STR = {
 	"VIC20;;",
-	"S0,D64G64,Mount #8;",
-	"S1,D64G64,Mount #9;",
+	"S1,D64G64,Mount #8;",
+	"S2,D64G64,Mount #9;",
 	"-;",
 	"F1,PRGCRTCT?TAP,Load;",
+	"FS2,CRTROM,Load Megacart;",
+	"h4RS,Save NVRAM;",
+	"h4OT,Autosave,Off,On;",
 	"-;",
 	"h3RG,Tape Play/Pause;",
 	"h3RI,Tape Unload;",
@@ -214,12 +217,12 @@ parameter CONF_STR = {
 	"h2d1ONO,Vertical Crop,No,270,216;",
 	"OPQ,Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-	"O6,ExtRAM $0400(3KB),Off,On;",
-	"O7,ExtRAM $2000(8KB),Off,On;",
-	"O8,ExtRAM $4000(8KB),Off,On;",
-	"O9,ExtRAM $6000(8KB),Off,On;",
-	"OA,ExtRAM $A000(8KB),Off,On;",
-	"-;",
+	"H4O6,ExtRAM $0400(3KB),Off,On;",
+	"H4O7,ExtRAM $2000(8KB),Off,On;",
+	"H4O8,ExtRAM $4000(8KB),Off,On;",
+	"H4O9,ExtRAM $6000(8KB),Off,On;",
+	"H4OA,ExtRAM $A000(8KB),Off,On;",
+	"H4-;",
 	"OL,External IEC,Disabled,Enabled;",
 	"OB,Cart is writable,No,Yes;", 
 	"-;",
@@ -227,6 +230,7 @@ parameter CONF_STR = {
 	"FC6,ROM,Load Kernal;",
 	"-;",
 	"R0,Reset;",
+	"RR,Reset & Detach Cartridge;",
 	"J,Fire;",
 	"V,v",`BUILD_DATE
 };
@@ -238,19 +242,23 @@ wire load_crt = (ioctl_index == 'h41);
 wire load_ct  = (ioctl_index == 'h81);
 wire load_tap = (ioctl_index == 'hC1);
 wire load_rom = (ioctl_index == 'h06);
+wire load_mc  = (ioctl_index[4:0] == 2);
 
 /////////////////  CLOCKS  ////////////////////////
 
 wire pal = ~status[14];
 
 wire clk_sys;
+wire pll_locked;
+
 pll pll
 (
 	.refclk(CLK_50M),
 	.reconfig_to_pll(reconfig_to_pll),
 	.reconfig_from_pll(reconfig_from_pll),
 	.outclk_0(clk_sys),
-	.outclk_1(CLK_VIDEO)
+	.outclk_1(CLK_VIDEO),
+	.locked(pll_locked)
 );
 
 wire [63:0] reconfig_to_pll;
@@ -335,29 +343,29 @@ wire  [7:0] ioctl_dout;
 wire [31:0] ioctl_file_ext;
 wire        forced_scandoubler;
 
-wire [31:0] sd_lba[2];
-wire  [5:0] sd_blk_cnt[2];
-wire  [1:0] sd_rd;
-wire  [1:0] sd_wr;
-wire  [1:0] sd_ack;
+wire [31:0] sd_lba[3];
+wire  [5:0] sd_blk_cnt[3];
+wire  [2:0] sd_rd;
+wire  [2:0] sd_wr;
+wire  [2:0] sd_ack;
 wire [13:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din[2];
+wire  [7:0] sd_buff_din[3];
 wire        sd_buff_wr;
-wire  [1:0] img_mounted;
+wire  [2:0] img_mounted;
 wire        img_readonly;
 wire [31:0] img_size;
 
 wire [21:0] gamma_bus;
 
-hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .BLKSZ(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(3), .BLKSZ(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({tap_loaded,en1080p,|vcrop,1'b0}),
+	.status_menumask({mc_loaded,tap_loaded,en1080p,|vcrop,1'b0}),
 	.forced_scandoubler(forced_scandoubler),
 	.gamma_bus(gamma_bus),
 
@@ -390,8 +398,8 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(2), .BLKSZ(1)) hps_io
 
 /////////////////  RESET  /////////////////////////
 
-wire sys_reset = RESET | status[0] | buttons[1];
-wire reset = sys_reset | cart_reset;
+wire sys_reset = RESET | status[0] | status[27] | buttons[1];
+wire reset = sys_reset | cart_reset | mc_reset;
 
 ////////////////  LOADING  ////////////////////////
 
@@ -468,8 +476,9 @@ always @(posedge clk_sys) begin
 		end
 	end
 
-	if(old_download && ~ioctl_download && load_crt) cart_reset <= 0;
-	if(sys_reset) {cart_reset, cart_blk} <= 0;
+	if((old_download ^ ioctl_download) & (load_crt | load_mc)) cart_reset <= ioctl_download;
+	if(status[27]) {cart_reset, cart_blk} <= 0;
+	if(ioctl_download & load_mc) cart_blk <= 0;
 
 	if(~old_download & ioctl_download & load_ct) begin
 		if(ioctl_file_ext[7:0] >= "2" && ioctl_file_ext[7:0] <= "9") addr <= {ioctl_file_ext[3:0],     12'h000};
@@ -477,6 +486,108 @@ always @(posedge clk_sys) begin
 	end
 end
 
+///////////////////////////////////////////////////
+
+reg mc_loaded = 0;
+always @(posedge clk_sys) begin
+	if(status[27] | (ioctl_download & load_crt)) mc_loaded <= 0;
+	if(ioctl_download & load_mc) mc_loaded <= 1;
+end
+
+wire        extmem_sel;
+wire        p2_h;
+
+wire        mc_reset;
+wire [22:0] mc_addr;
+wire        mc_wr_n;
+wire        mc_nvram_sel;
+wire        mc_rom_sel;
+
+wire        vic_wr_n;
+wire        vic_io2_sel;
+wire        vic_io3_sel;
+wire        vic_blk123_sel;
+wire        vic_blk5_sel;
+wire        vic_ram123_sel;
+wire  [7:0] vic_data;
+wire [15:0] vic_addr;
+
+megacart mc
+(
+	.clk(clk_sys),
+	.reset_n(mc_loaded & ~sys_reset & ~cart_reset),
+
+	.vic_addr(vic_addr),
+	.vic_wr_n(vic_wr_n),
+	.vic_io2_sel(vic_io2_sel),
+	.vic_io3_sel(vic_io3_sel),
+	.vic_blk123_sel(vic_blk123_sel),
+	.vic_blk5_sel(vic_blk5_sel),
+	.vic_ram123_sel(vic_ram123_sel),
+	.vic_data(vic_data),
+
+	.mc_addr(mc_addr),
+	.mc_wr_n(mc_wr_n),
+	.mc_nvram_sel(mc_nvram_sel),
+	.mc_soft_reset(mc_reset)
+);
+
+reg ioctl_wr_d;
+always @(posedge clk_sys) ioctl_wr_d <= ioctl_wr;
+
+wire [7:0] sdram_out;
+sdram ram
+(
+    .*,
+    .clk(clk_sys),
+    .init(~pll_locked),
+    .clkref(ioctl_download ? ioctl_wr : p2_h),
+
+    .dout(sdram_out),
+    .din ((ioctl_download & load_mc) ? ioctl_dout : vic_data),
+    .addr((ioctl_download & load_mc) ? ioctl_addr : mc_addr),
+    .we  ((ioctl_download & load_mc) ? ioctl_wr_d : (~mc_nvram_sel & extmem_sel & ~mc_wr_n)),
+    .oe  ((ioctl_download & load_mc) ? 1'b0       : (~mc_nvram_sel & extmem_sel & mc_wr_n))
+);
+
+wire [7:0] mc_nvram_out;
+gen_dpram #(13, 8) mc_nvram
+(
+	.clock_a(clk_sys),
+	.address_a(vic_addr),
+	.data_a(vic_data),
+	.wren_a(mc_nvram_sel & ~mc_wr_n),
+	.q_a(mc_nvram_out),
+
+	.clock_b(clk_sys),
+	.address_b(sd_buff_addr),
+	.data_b(sd_buff_dout),
+	.wren_b(sd_buff_wr & sd_ack[0]),
+	.q_b(sd_buff_din[0])
+);
+
+assign sd_blk_cnt[0] = 31;
+assign sd_lba[0] = 0;
+
+reg mc_nvram_dirty;
+always @(posedge clk_sys) begin
+	reg old_mounted;
+	reg old_status, old_flg;
+
+	if(sd_ack[0] | ~mc_loaded) mc_nvram_dirty <= 0;
+	if(mc_nvram_sel & ~mc_wr_n & mc_loaded) mc_nvram_dirty <= 1;
+	
+	old_mounted <= img_mounted[0];
+	if(old_mounted & ~img_mounted[0]) sd_rd[0] <= 1;
+	
+	old_flg <= status[28];
+	old_status <= OSD_STATUS;
+	if(((~old_status & OSD_STATUS & status[29]) | (~old_flg & status[28])) & mc_nvram_dirty) sd_wr[0] <= 1;
+	
+	if(sd_ack[0]) {sd_rd[0], sd_wr[0]} <= 0;
+end
+
+wire [7:0] mc_data = mc_nvram_sel ? mc_nvram_out : sdram_out;
 
 ///////////////////////////////////////////////////
 
@@ -498,6 +609,7 @@ VIC20 VIC20
 	.i_sysclk(clk_sys),
 	.i_sysclk_en(v20_en),
 	.i_reset(reset|tv_reset),
+	.o_p2h(p2_h),
 
 	//IEC
 	.atn_o(v20_iec_atn_o),
@@ -509,8 +621,8 @@ VIC20 VIC20
 	.i_joy(~{joy[0],joy[1],joy[2],joy[3]}),
 	.i_fire(~joy[4]),
 
-	.i_ram_ext_ro(cart_blk & ~{5{status[11]}}),
-	.i_ram_ext(extram|cart_blk),
+	.i_ram_ext_ro(mc_loaded ? 5'b00000 : (cart_blk & ~{5{status[11]}})),
+	.i_ram_ext   (mc_loaded ? 5'b11111 : (extram|cart_blk)),
 
 	.o_ce_pix(i_ce_pix),
 	.o_video_r(r),
@@ -523,6 +635,18 @@ VIC20 VIC20
 	.i_center(status[13:12]+2'b11),
 	.i_pal(pal),
 	.i_wide(wide),
+
+	.i_extmem_en(mc_loaded),
+	.o_extmem_sel(extmem_sel),
+	.o_extmem_r_wn(vic_wr_n),
+	.o_extmem_addr(vic_addr),
+	.o_extmem_data(vic_data),
+	.i_extmem_data(mc_data),
+	.o_io2_sel(vic_io2_sel),
+	.o_io3_sel(vic_io3_sel),
+	.o_blk123_sel(vic_blk123_sel),
+	.o_blk5_sel(vic_blk5_sel),
+	.o_ram123_sel(vic_ram123_sel),
 
 	.ps2_key(v20_key),
 	.tape_play(key_play),
@@ -662,7 +786,7 @@ c1541_multi #(.PARPORT(0)) c1541
 	.reset({reset|tv_reset | ~drive_mounted[1], reset|tv_reset | ~drive_mounted[0]}),
 	.ce(ce_c1541),
 
-	.img_mounted(img_mounted),
+	.img_mounted(img_mounted[2:1]),
 	.img_readonly(img_readonly),
 	.img_size(img_size),
 
@@ -678,16 +802,16 @@ c1541_multi #(.PARPORT(0)) c1541
 
 	.clk_sys(clk_sys),
 
-	.sd_lba(sd_lba),
-	.sd_blk_cnt(sd_blk_cnt),
-	.sd_rd(sd_rd),
-	.sd_wr(sd_wr),
-	.sd_ack(sd_ack),
+	.sd_lba(sd_lba[1:2]),
+	.sd_blk_cnt(sd_blk_cnt[1:2]),
+	.sd_rd(sd_rd[2:1]),
+	.sd_wr(sd_wr[2:1]),
+	.sd_ack(sd_ack[2:1]),
 	.sd_buff_addr(sd_buff_addr),
 	.sd_buff_dout(sd_buff_dout),
-	.sd_buff_din(sd_buff_din),
+	.sd_buff_din(sd_buff_din[1:2]),
 	.sd_buff_wr(sd_buff_wr),
-	
+
 	.rom_addr(ioctl_addr[13:0]),
 	.rom_data(ioctl_dout),
 	.rom_wr(ioctl_wr && (ioctl_addr[24:14] == 0) && load_rom),
@@ -696,8 +820,8 @@ c1541_multi #(.PARPORT(0)) c1541
 
 reg [1:0] drive_mounted = 0;
 always @(posedge clk_sys) begin 
-	if(img_mounted[0]) drive_mounted[0] <= |img_size;
-	if(img_mounted[1]) drive_mounted[1] <= |img_size;
+	if(img_mounted[1]) drive_mounted[0] <= |img_size;
+	if(img_mounted[2]) drive_mounted[1] <= |img_size;
 end
 
 reg ce_c1541;
