@@ -117,12 +117,12 @@ architecture RTL of M6561 is
   constant PAL_H_END_OFF           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   -- video size 228 pixels by 284 lines (PAL)
 
-  constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(261, 9));
+  constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(259, 9));
   constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(260, 9));
-  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
-  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(247, 9));
+  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 27, 9));
+  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(237, 9));
   constant NTSC_V_START            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 16, 9));
-  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 28, 5));
+  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 16, 5));
   constant NTSC_H_START_OFF        : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
   constant NTSC_H_END_OFF          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
 
@@ -180,7 +180,9 @@ architecture RTL of M6561 is
   signal r_x_offset       : std_logic_vector(6 downto 0) :=  "0001100"; -- 12
   signal r_y_offset       : std_logic_vector(7 downto 0) := "00100110"; -- 38
   signal r_num_cols       : std_logic_vector(6 downto 0) :=  "0010110"; -- 22
+  signal r_num_cols_latch : std_logic_vector(6 downto 0) :=  "0010110"; -- 22
   signal r_num_rows       : std_logic_vector(5 downto 0) :=   "010111"; -- 23
+  signal r_num_rows_latch : std_logic_vector(5 downto 0) :=   "010111"; -- 23
   signal r_charsize       : std_logic := '0';
   signal r_screen_mem     : std_logic_vector(4 downto 0) := "11111";
   signal r_char_mem       : std_logic_vector(3 downto 0) := "0000";
@@ -206,36 +208,75 @@ architecture RTL of M6561 is
 
   -- timing
   signal hcnt             : std_logic_vector(8 downto 0) := "000000000";
+  signal hcnt_next        : std_logic_vector(8 downto 0) := "000000000";
   signal vcnt             : std_logic_vector(8 downto 0) := "000000000";
+  signal vcnt_next        : std_logic_vector(8 downto 0) := "000000000";
   signal vcnt_c           : std_logic_vector(8 downto 0);
 
   signal do_hsync         : boolean;
   signal hblank           : std_logic;
-  signal vblank           : std_logic;
+  signal vblank           : std_logic := '1';
   signal vblank_c         : std_logic;
   signal hsync            : std_logic;
   signal vsync            : std_logic;
   signal vsync_c          : std_logic;
 
+  signal num_cols         : std_logic_vector(6 downto 0);
   signal start_h          : boolean;
-  signal h_char_cnt       : std_logic_vector(9 downto 0);
-  signal h_char_last      : std_logic;
+  signal start_hD         : boolean;
+  signal start_hD2        : boolean;
+  signal start_hD3        : boolean;
+  signal end_h            : boolean;
+  signal h_char_cnt       : std_logic_vector(8 downto 0);
+  signal h_char_cnt_r     : std_logic_vector(8 downto 0);
+  signal h_row_active     : boolean;
+  signal h_row_active_r   : boolean;
+  signal h_row_activeD    : boolean;
+  signal h_row_activeD2   : boolean;
+  signal h_active         : boolean;
+  signal h_active_r       : boolean;
+  signal h_activeD        : boolean;
+  signal h_activeD2       : boolean;
+  signal h_activeD3       : boolean;
+  signal h_activeD4       : boolean;
+  signal h_cnt_last       : boolean;
+  signal v_cnt_last       : boolean;
   signal start_v          : boolean;
-  signal v_char_cnt       : std_logic_vector(10 downto 0);
+  signal end_v            : boolean;
   signal v_char_last      : boolean;
+  signal v_char_lastD     : boolean;
+  signal v_char_lastD2    : boolean;
+  signal row_count        : std_logic_vector(3 downto 0);
+  signal row_count_r      : std_logic_vector(3 downto 0);
+  signal row_char         : std_logic_vector(5 downto 0);
+  signal row_char_r       : std_logic_vector(5 downto 0);
+  signal v_active_r       : boolean;
+  signal v_active         : boolean;
+  signal v_activeD        : boolean;
+  signal v_activeD2       : boolean;
+  signal v_activeD3       : boolean;
 
   signal matrix_cnt       : std_logic_vector(13 downto 0);
   signal last_matrix_cnt  : std_logic_vector(13 downto 0);
   signal din_reg_cell     : std_logic_vector(11 downto 0);
   signal din_reg_char     : std_logic_vector(11 downto 0);
   signal char_load        : std_logic;
+  signal char_loadD       : std_logic;
+  signal char_loadD2      : std_logic;
+  signal char_loadD3      : std_logic;
+  signal char_loadD4      : std_logic;
   signal doing_cell       : std_logic;
+  signal cell_addr        : std_logic_vector(13 downto 0);
 
   signal op_cnt           : std_logic_vector(3 downto 0) := (others => '0');
+  signal border_n         : std_logic;
+  signal op_cnt_r         : std_logic_vector(3 downto 0) := (others => '0');
   signal op_reg           : std_logic_vector(7 downto 0);
 
   signal op_multi         : std_logic;
+  signal op_multi_r       : std_logic;
   signal op_col           : std_logic_vector(2 downto 0);
+  signal op_col_r         : std_logic_vector(2 downto 0);
 
   signal col_mux_sel      : std_logic_vector(3 downto 0);
   signal col_rgb          : std_logic_vector(11 downto 0);
@@ -270,8 +311,6 @@ architecture RTL of M6561 is
   signal noise_sg_cnt     : std_logic_vector(6 downto 0) := (others => '0');
   signal noise_sg_sreg    : std_logic_vector(7 downto 0) := (others => '0');  
   signal noise_LFSR       : std_logic_vector(15 downto 0) := (others => '0');
-  signal noise_LFSR0_old  : std_logic;  
-  signal noise_LFSR_et    : std_logic;  
 
   signal audio_wav        : std_logic_vector(3 downto 0);
   signal audio_mul_out    : std_logic_vector(7 downto 0);
@@ -332,7 +371,7 @@ begin
       r_reverse_mode   <= '1'; -- 1 is off
       r_backgnd_colour <= "0001";
     elsif rising_edge(I_CLK) then
-      if (I_ENA_4 = '1') then
+      if (I_ENA_4 = '1' and ena_1mhz_int = '1') then
         if (I_RW_L = '0') and (cs = '1') then -- cpu read access
            --the data sheet claims the registers alias
           case I_ADDR(3 downto 0) is
@@ -374,6 +413,7 @@ begin
             
             when x"E" => r_aux_colour             <= I_DATA(7 downto 4);
                          r_amplitude              <= I_DATA(3 downto 0);
+
             when x"F" => r_backgnd_colour         <= I_DATA(7 downto 4);
                          r_reverse_mode           <= I_DATA(3);
                          r_border_colour          <= I_DATA(2 downto 0);
@@ -443,19 +483,24 @@ begin
   --
   -- hsync blank picture blank
   -- 20    24    228     12     total 284 clock
-  p_hvcnt : process (I_CLK) is
+  h_cnt_last <= hcnt = CLOCKS_PER_LINE_M1;
+  v_cnt_last <= vcnt = TOTAL_LINES_M1;
+  hcnt_next <= (others => '0') when h_cnt_last else hcnt + 1;
+  vcnt_next <= (others => '0') when h_cnt_last and v_cnt_last else vcnt + 1 when h_cnt_last else vcnt;
+
+  p_hvcnt : process (I_CLK, I_RESET_L) is
 		variable tmp : std_logic_vector(8 downto 0);
   begin
-    if rising_edge(I_CLK) then
+    if (I_RESET_L = '0') then
+      hcnt <= "000000000";
+      vcnt <= "000000000";
+    elsif rising_edge(I_CLK) then
       if (I_ENA_4 = '1') then
-        if (hcnt = CLOCKS_PER_LINE_M1) then
-          hcnt <= "000000000";
-        else
-          hcnt <= hcnt +"1";
-        end if;
+        hcnt <= hcnt_next;
+        vcnt <= vcnt_next;
 
         if do_hsync then
-          if (vcnt = TOTAL_LINES_M1) then
+          if (v_cnt_last) then
 				tmp := "000000000";
           else
             tmp := vcnt +"1";
@@ -477,9 +522,13 @@ begin
   vsync <= '1' when (vcnt(8 downto 2) = "0000000") else '0';
   vsync_c <= '1' when (vcnt_c(8 downto 2) = "0000000") else '0';
 
-  p_sync : process (I_CLK) is
+  p_sync : process (I_CLK, I_RESET_L) is
   begin
-    if rising_edge(I_CLK) then
+    if (I_RESET_L = '0') then
+      hblank <= '1';
+      hsync <= '1';
+      vblank <= '1';
+    elsif rising_edge(I_CLK) then
       if (I_ENA_4 = '1') then
         if (hcnt = H_END_M1) then
           hblank <= '1';
@@ -492,12 +541,12 @@ begin
           hsync <= '0';
         end if;
         if do_hsync then
-          if (vcnt = TOTAL_LINES_M1-3) then
+          if v_cnt_last then
             vblank <= '1';
           elsif (vcnt = V_START) then
             vblank <= '0';
           end if;
-          if (vcnt_c = TOTAL_LINES_M1-3) then
+          if (vcnt_c = TOTAL_LINES_M1) then
             vblank_c <= '1';
           elsif (vcnt_c = V_START) then
             vblank_c <= '0';
@@ -512,44 +561,161 @@ begin
   O_COMP_SYNC_L <= (not vsync) and (not hsync);
 
   --
-  -- addr
+  -- video gen
   --
-  p_matrix_address : process (I_CLK) is
-    variable cell_addr : std_logic_vector(13 downto 0);
-    variable char_addr : std_logic_vector(13 downto 0);
+  p_vid_cnt : process(hcnt, r_x_offset, vcnt, r_y_offset, v_active, v_active_r, row_char_r, row_count_r, h_active_r, h_char_cnt_r, h_row_active_r,
+    num_cols, r_num_cols, r_num_cols_latch, r_num_rows_latch, r_charsize, start_v, end_v, v_cnt_last, start_h, end_h, v_char_last, p2_h_int, c_x_offset, K_OFFSET,
+    cs, I_RW_L, I_ADDR, I_DATA, I_CENTER)
+  begin
+    v_active <= v_active_r;
+    row_count <= row_count_r;
+    row_char <= row_char_r;
+    h_active <= h_active_r;
+    h_char_cnt <= h_char_cnt_r;
+    h_row_active <= h_row_active_r;
+    num_cols <= r_num_cols_latch;
+
+    if hcnt(8 downto 1) = 0 then
+      if I_RW_L = '0' and cs = '1' and I_ADDR(3 downto 0) = x"2" then
+        num_cols <= I_DATA(6 downto 0);
+      else
+        num_cols <= r_num_cols;
+      end if;
+    end if;
+
+	 if I_CENTER(0)='1' then
+		start_h <= (hcnt(8 downto 2) + K_OFFSET(4 downto 2) = c_x_offset);
+	 else
+		start_h <= (hcnt(8 downto 2) = r_x_offset);
+    end if;
+
+    end_h <= (h_char_cnt_r = (num_cols(5 downto 0) & "000"));
+    start_v <= (vcnt(8 downto 1) = r_y_offset) and p2_h_int = '0';
+    end_v <= row_char_r = r_num_rows_latch;
+
+    if (r_charsize = '0') then
+      v_char_last <= (row_count_r(2 downto 0) = "111");
+    else
+      v_char_last <= (row_count_r(3 downto 0) = "1111");
+    end if;
+
+    if start_v and not v_active_r then
+      v_active <= true;
+      row_count <= (others => '0');
+      row_char <= (others => '0');
+    end if;
+    if end_v or v_cnt_last then
+      v_active <= false;
+      row_count <= (others => '0');
+      row_char <= (others => '0');
+    end if;
+
+    if h_active_r then
+      if end_h or hcnt = 0 then
+        h_active <= false;
+        h_char_cnt <= (others => '0');
+      else
+        h_char_cnt <= h_char_cnt_r + 1;
+      end if;
+    end if;
+
+    if h_row_active_r and hcnt = 0 then
+      if v_char_last then
+        row_count <= (others => '0');
+        row_char <= row_char_r + 1;
+      else
+        row_count <= row_count_r + 1;
+      end if;
+      h_row_active <= false;
+		end if;
+
+    if hcnt(1 downto 0) = "00" and start_h and v_active and not h_active_r then
+      h_active <= true;
+      h_row_active <= true;
+      h_char_cnt <= (others => '0');
+    end if;
+  end process;
+
+  p_vid_cnt_r : process (I_CLK) is
+    variable h_end : boolean;
   begin
     if rising_edge(I_CLK) then
       if (I_ENA_4 = '1') then
-        -- counter used for video matrix address
-        if (vsync = '1') then
-          last_matrix_cnt(13 downto 9) <= r_screen_mem;
-          last_matrix_cnt( 8 downto 0) <= (others => '0'); -- top left;
-        elsif (h_char_last = '1') and v_char_last then
-          last_matrix_cnt <= last_matrix_cnt + r_num_cols;
+        r_num_cols_latch <= num_cols;
+
+        if hcnt(8 downto 1) = 3 and vcnt = 0 then
+          r_num_rows_latch <= r_num_rows;
         end if;
-        if (hsync = '1') then
+
+        v_active_r <= v_active;
+        h_active_r <= h_active;
+				h_row_active_r <= h_row_active;
+        h_char_cnt_r <= h_char_cnt;
+        row_count_r <= row_count;
+        row_char_r <= row_char;
+      end if;
+    end if;
+  end process;
+
+  --
+  -- addr
+  --
+  O_ADDR <= matrix_cnt + (r_screen_mem & "000000000") when doing_cell = '1' else
+            (r_char_mem & "0000000000") + cell_addr;
+
+  p_matrix_address : process (I_CLK) is
+  begin
+    if rising_edge(I_CLK) then
+      if (I_ENA_4 = '1') then
+        if hcnt(1 downto 0) = "11" then
+
+          h_activeD <= h_active;
+          h_activeD2 <= h_activeD;
+          h_activeD3 <= h_activeD2;
+
+          h_row_activeD <= h_row_active;
+          h_row_activeD2 <= h_row_activeD;
+
+          v_activeD <= v_active;
+          v_activeD2 <= v_activeD;
+          v_activeD3 <= v_activeD2;
+        end if;
+
+        if hcnt(1 downto 0) = "00" then
+          start_hD <= start_h;
+          start_hD2 <= start_hD;
+          start_hD3 <= start_hD2;
+
+          v_char_lastD <= v_char_last;
+          v_char_lastD2 <= v_char_lastD;
+        end if;
+
+        h_activeD4 <= h_activeD3;
+
+        -- counter used for video matrix address
+        if v_cnt_last and h_cnt_last then
+          last_matrix_cnt <= (others => '0'); -- top left;
+        elsif hcnt(1 downto 0) = "11" and v_char_lastD2 and h_row_activeD2 then
+          last_matrix_cnt <= matrix_cnt;
+        end if;
+
+        if start_hD3 and v_activeD3 and not h_activeD4 then
           matrix_cnt <= last_matrix_cnt;
-        elsif (char_load = '1') then
+          doing_cell <= '1';
+        elsif char_load = '1' then
           matrix_cnt <= matrix_cnt + "1";
-         end if;
+        end if;
 
         -- address
-        if (hcnt(1 downto 0) = "01") then
-          if (h_char_cnt(2) = '0') then
-            -- if cell fetch
-            doing_cell <= '1';
-            O_ADDR(13 downto 0) <= matrix_cnt;
-          else
-            -- if char fetch
-            doing_cell <= '0';
+        if (hcnt(1 downto 0) = "11") and h_activeD3 then
+          doing_cell <= not doing_cell;
+          if doing_cell = '1' then
             -- experiments show this is the correct behaviour
             if (r_charsize = '0') then
-              cell_addr := ("000" & din_reg_cell(7 downto 0) & v_char_cnt(2 downto 0));
+              cell_addr <= ("000" & I_DATA(7 downto 0) & row_count(2 downto 0));
             else
-              cell_addr := ("00"  & din_reg_cell(7 downto 0) & v_char_cnt(3 downto 0));
+              cell_addr <= ("00"  & I_DATA(7 downto 0) & row_count(3 downto 0));
             end if;
-            char_addr := (r_char_mem & "0000000000") + cell_addr;
-            O_ADDR(13 downto 0) <= char_addr;
           end if;
         end if;
         if (hcnt(1 downto 0) = "11") then
@@ -563,63 +729,11 @@ begin
     end if;
   end process;
 
-  --
-  -- video gen
-  --
-  start_h <= (hcnt = (c_x_offset & "00")) when I_CENTER(0)='1' else (hcnt = ((r_x_offset & "00") + K_OFFSET));
-  start_v <= (vcnt = (r_y_offset & '0'));
-
-  p_char_cnt : process (I_CLK) is
-    variable h_end : boolean;
-    variable v_end : boolean;
-  begin
-    if rising_edge(I_CLK) then
-      if (I_ENA_4 = '1') then
-        h_end := (h_char_cnt(8 downto 0) = (r_num_cols(5 downto 0) & "000"));
-        h_char_last <= '0';
-        if start_h then
-          h_char_cnt <= "1000000000";
-        elsif (h_char_cnt(9) = '1') then -- active
-          --if h_end then --or (hblank = '1') then -- hblank removed to ensure we still get a picture with daft offset values
-          if h_end or do_hsync then
-            h_char_cnt <= (others => '0');
-            h_char_last <= '1';
-          else
-            h_char_cnt <= h_char_cnt + "1";
-          end if;
-        end if;
-        if (r_charsize = '0') then
-          v_end := (v_char_cnt(8 downto 0) = (r_num_rows(5 downto 0) & "000"));
-        else
-          v_end := (v_char_cnt(9 downto 0) = (r_num_rows(5 downto 0) & "0000"));
-        end if;
-        if v_end or (vcnt = TOTAL_LINES_M1) then
-          v_char_cnt <= (others => '0');
-        else
-          if start_h then
-            if start_v then
-              v_char_cnt <= "10000000000";
-            elsif (v_char_cnt(10) = '1') then -- active
-              v_char_cnt <= v_char_cnt + "1";
-            end if;
-          end if;
-        end if;
-        if (r_charsize = '0') then
-          v_char_last <= (v_char_cnt(2 downto 0) = "111");
-        else
-          v_char_last <= (v_char_cnt(3 downto 0) = "1111");
-        end if;
-      end if;
-    end if;
-  end process;
-
-  p_char_load : process(h_char_cnt, v_char_cnt)
+  p_char_load : process(hcnt, h_activeD3, v_activeD3, doing_cell)
   begin
     char_load <= '0';
-    if ((h_char_cnt(9) = '1') and (v_char_cnt(10) = '1')) then
-      if (h_char_cnt(2 downto 0) = "111") then
-        char_load <= '1';
-      end if;
+    if (h_activeD3 and v_activeD3 and (hcnt(1 downto 0) = "11") and (doing_cell = '0')) then
+      char_load <= '1';
     end if;
   end process;
 
@@ -630,11 +744,20 @@ begin
         -- this would be better as a shift register, but to keep it simple ..
         -- op_cnt(3) is used as character_matrix_active (0 = border)
         if (char_load = '1') then
-          op_cnt(3 downto 0) <= "1000";
+          op_cnt_r(3 downto 0) <= "1000";
+        end if;
+
+        char_loadD <= char_load;
+        char_loadD2 <= char_loadD;
+        char_loadD3 <= char_loadD2;
+        char_loadD4 <= char_loadD3;
+
+        if char_loadD4 = '1' then
+          op_cnt <= op_cnt_r;
           --buffer character
           op_reg   <= din_reg_char(7 downto 0);
-          op_multi <= din_reg_cell(11);
-          op_col   <= din_reg_cell(10 downto 8);
+          op_multi_r <= din_reg_cell(11);
+          op_col_r   <= din_reg_cell(10 downto 8);
         elsif (op_cnt(3) = '1') then
           op_cnt <= op_cnt + "1";
         end if;
@@ -642,36 +765,46 @@ begin
     end if;
   end process;
 
-  p_char_sel : process(op_cnt, op_reg)
+  p_char_sel : process(I_CLK)
   begin
-    -- yuk, a mux. Hang the expense.
-    bit_sel <= '0';
-    case op_cnt(2 downto 0) is
-      when "000" => bit_sel <= op_reg(7);
-      when "001" => bit_sel <= op_reg(6);
-      when "010" => bit_sel <= op_reg(5);
-      when "011" => bit_sel <= op_reg(4);
-      when "100" => bit_sel <= op_reg(3);
-      when "101" => bit_sel <= op_reg(2);
-      when "110" => bit_sel <= op_reg(1);
-      when "111" => bit_sel <= op_reg(0);
-      when others => null;
-    end case;
-    bit_sel_m <= "00";
-    case op_cnt(2 downto 0) is
-      when "000" => bit_sel_m <= op_reg(7 downto 6);
-      when "001" => bit_sel_m <= op_reg(7 downto 6);
-      when "010" => bit_sel_m <= op_reg(5 downto 4);
-      when "011" => bit_sel_m <= op_reg(5 downto 4);
-      when "100" => bit_sel_m <= op_reg(3 downto 2);
-      when "101" => bit_sel_m <= op_reg(3 downto 2);
-      when "110" => bit_sel_m <= op_reg(1 downto 0);
-      when "111" => bit_sel_m <= op_reg(1 downto 0);
-      when others => null;
-    end case;
+    if rising_edge(I_CLK) then
+      if (I_ENA_4 = '1') then
+        border_n <= op_cnt(3);
+        -- yuk, a mux. Hang the expense.
+        bit_sel <= '0';
+
+		  -- AMR - delay op_multi and op_col to match delay on bit_sel, otherwise colour changes happen a pixel too soon.
+        op_multi <= op_multi_r;
+        op_col   <= op_col_r;
+		  
+        case op_cnt(2 downto 0) is
+          when "000" => bit_sel <= op_reg(7);
+          when "001" => bit_sel <= op_reg(6);
+          when "010" => bit_sel <= op_reg(5);
+          when "011" => bit_sel <= op_reg(4);
+          when "100" => bit_sel <= op_reg(3);
+          when "101" => bit_sel <= op_reg(2);
+          when "110" => bit_sel <= op_reg(1);
+          when "111" => bit_sel <= op_reg(0);
+          when others => null;
+        end case;
+        bit_sel_m <= "00";
+        case op_cnt(2 downto 0) is
+          when "000" => bit_sel_m <= op_reg(7 downto 6);
+          when "001" => bit_sel_m <= op_reg(7 downto 6);
+          when "010" => bit_sel_m <= op_reg(5 downto 4);
+          when "011" => bit_sel_m <= op_reg(5 downto 4);
+          when "100" => bit_sel_m <= op_reg(3 downto 2);
+          when "101" => bit_sel_m <= op_reg(3 downto 2);
+          when "110" => bit_sel_m <= op_reg(1 downto 0);
+          when "111" => bit_sel_m <= op_reg(1 downto 0);
+          when others => null;
+        end case;
+    end if;
+  end if;
   end process;
 
-  p_char_decode : process(op_cnt, op_multi, bit_sel, bit_sel_m, r_reverse_mode)
+  p_char_decode : process(op_cnt, op_multi, bit_sel, bit_sel_m, r_reverse_mode, border_n)
   begin
     -- bit_sel_m codes
     -- 00 background colour
@@ -679,7 +812,7 @@ begin
     -- 10 forground colour
     -- 11 aux colour
     bit_sel_final <= "00";
-    if (op_cnt(3) = '0') then
+    if border_n = '0' then
       -- border
       bit_sel_final <= "01";
     else
@@ -746,6 +879,7 @@ begin
       end if;
     end if;
   end process;
+  
 
   p_lightpen : process (I_CLK) is
   begin
@@ -765,13 +899,13 @@ begin
   --
   -- AUDIO
   --
-  p_sound_div : process (I_CLK) is	
+  p_sound_div : process (I_CLK) is
   begin
 	  -- clkfreq = 4435000 Hz PAL or 4090000 Hz NTSC
     -- bass    freq f = clkfreq/64/16/(128-(($900a+1)&127))
     -- alto    freq f = clkfreq/32/16/(128-(($900b+1)&127))
     -- soprano freq f = clkfreq/16/16/(128-(($900c+1)&127))
-    -- noise   freq f = clkfreq/16/ 8/(128-(($900d+1)&127))
+    -- noise   freq f = clkfreq/ 8/16/(128-(($900d+1)&127))
     -- the 6561 has also a /128 clock divider, but it's not connected anywhere
     if rising_edge(I_CLK) then
       if (I_ENA_4 = '1') then
@@ -784,18 +918,10 @@ begin
     end if;
   end process;
 
---p_sound_genx : process (noise_LFSR(0)) is
---begin  
---	 if rising_edge(noise_LFSR(0)) then
---      noise_sg_sreg <= noise_sg_sreg(6 downto 0) & (not noise_sg_sreg(7) and r_noise_enabled);					
---    end if;  
---  end process;
-  
   p_sound_gen : process (I_CLK) is    
     variable a_sum : unsigned(5 downto 0); -- sum is 0 to 4*15	
     variable wave_max_value : unsigned(5 downto 0);
     variable wave_mid_value : unsigned(5 downto 0);
-	 variable fe : std_logic;
   begin
     if rising_edge(I_CLK) then
       if (I_ENA_4 = '1') then
@@ -835,32 +961,18 @@ begin
         
         -- noise gen        
         if audio_div_8 then          
-          if noise_sg_cnt = "1111111" then			   
-            noise_sg_cnt <= r_noise_freq + "1";				
-								
-			   if noise_LFSR(0)='1' and noise_LFSR0_old='0' then
-			      noise_sg_sreg <= noise_sg_sreg(6 downto 0) & (not noise_sg_sreg(7) and r_noise_enabled);								      
-			   end if;
-
-			   noise_LFSR0_old <= noise_LFSR(0);				
+          if noise_sg_cnt = "1111111" then
+            noise_sg_cnt <= r_noise_freq + "1";
+            if noise_LFSR(0)='1' then 
+              noise_sg_sreg <= noise_sg_sreg(6 downto 0) & (not noise_sg_sreg(7) and r_noise_enabled);
+            end if;              
             noise_LFSR(15 downto 1) <= noise_LFSR(14 downto 0);            
-				noise_LFSR(0)           <= ((noise_LFSR(3) xor noise_LFSR(12)) xnor (noise_LFSR(14) xor noise_LFSR(15))) nand r_noise_enabled;                          
-				
-				--fe := ((noise_LFSR(3) xor noise_LFSR(12)) xnor (noise_LFSR(14) xor noise_LFSR(15))) nand r_noise_enabled;
-				--if fe='1' and noise_LFSR(0)='0' then
-				--	noise_LFSR_et <= '1';
-				--end if;
+            noise_LFSR(0)           <= ((noise_LFSR(3) xor noise_LFSR(12)) xnor (noise_LFSR(14) xor noise_LFSR(15))) nand r_noise_enabled;              
           else
             noise_sg_cnt <= noise_sg_cnt + "1";
           end if;          
-			 
-			 --if noise_LFSR_et = '1' then
-			 --	noise_sg_sreg <= noise_sg_sreg(6 downto 0) & (not noise_sg_sreg(7) and r_noise_enabled);					
-			 --   noise_LFSR_et <= '0';
-			 --end if;
-			 
         end if;
-        noise_sg <= noise_sg_sreg(0) and r_noise_enabled;
+        noise_sg <= noise_sg_sreg(0);
         
         -- 'mixer'        
         wave_max_value := unsigned("00"  & r_amplitude);             
