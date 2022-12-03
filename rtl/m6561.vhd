@@ -109,20 +109,20 @@ architecture RTL of M6561 is
   -- clocks per line must be divisable by 4
   constant PAL_CLOCKS_PER_LINE_M1  : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(283, 9));
   constant PAL_TOTAL_LINES_M1      : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(311, 9));
-  constant PAL_H_START_M1          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
-  constant PAL_H_END_M1            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(271, 9));
+  constant PAL_H_START_M1          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 47, 9));
+  constant PAL_H_END_M1            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(275, 9));
   constant PAL_V_START             : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 28, 9));
-  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 16, 5));
+  constant PAL_K_OFFSET            : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned(  0, 5));
   constant PAL_H_START_OFF         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   constant PAL_H_END_OFF           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 20, 9));
   -- video size 228 pixels by 284 lines (PAL)
 
   constant NTSC_CLOCKS_PER_LINE_M1 : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(259, 9));
   constant NTSC_TOTAL_LINES_M1     : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(260, 9));
-  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 27, 9));
-  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(237, 9));
+  constant NTSC_H_START_M1         : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 43, 9));
+  constant NTSC_H_END_M1           : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(247, 9));
   constant NTSC_V_START            : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned( 16, 9));
-  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 16, 5));
+  constant NTSC_K_OFFSET           : std_logic_vector(4 downto 0) := std_logic_vector(to_unsigned( 12, 5));
   constant NTSC_H_START_OFF        : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
   constant NTSC_H_END_OFF          : std_logic_vector(8 downto 0) := std_logic_vector(to_unsigned(  0, 9));
 
@@ -383,7 +383,7 @@ begin
             when x"2" => r_screen_mem(0)          <= I_DATA(7);
                          r_num_cols               <= I_DATA(6 downto 0);
 								 temp := (H_END_M1 - H_START_M1) - (I_DATA(5 downto 0)&"000");
-								 temp := H_START_M1 + ('0'&temp(8 downto 1)) - "000001000";
+								 temp := H_START_M1 + ('0'&temp(8 downto 1)) - "000011000";
 								 c_x_offset <= temp(8 downto 2);
 
             when x"3" => r_num_rows               <= I_DATA(6 downto 1);
@@ -584,9 +584,9 @@ begin
     end if;
 
 	 if I_CENTER(0)='1' then
-		start_h <= (hcnt(8 downto 2) + K_OFFSET(4 downto 2) = c_x_offset);
+		start_h <= (hcnt(8 downto 2)= c_x_offset);
 	 else
-		start_h <= (hcnt(8 downto 2) = r_x_offset);
+		start_h <= (hcnt(8 downto 2) - K_OFFSET(4 downto 2) = r_x_offset);
     end if;
 
     end_h <= (h_char_cnt_r = (num_cols(5 downto 0) & "000"));
