@@ -191,7 +191,7 @@ assign HDMI_FREEZE = 0;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// X XXX XXXXXXXXXXXXXXXXXXXXXXXX
+// X XXX XXXXXXXXXXXXXXXXXXXXXXXXX
 
 `include "build_id.v" 
 parameter CONF_STR = {
@@ -229,9 +229,11 @@ parameter CONF_STR = {
 	"OF,Kernal,Loadable,Standard;",
 	"FC6,ROM,Load Kernal;",
 	"-;",
+	"OU,Swap paddles,No,Yes;",
+	"-;",
 	"R0,Reset;",
 	"RR,Reset & Detach Cartridge;",
-	"J,Fire;",
+	"J,Fire,Paddle Fire|P;",
 	"V,v",`BUILD_DATE
 };
 
@@ -331,6 +333,7 @@ end
 wire [31:0] status;
 wire  [1:0] buttons;
 
+wire  [7:0] pd1,pd2;
 wire [15:0] joya, joyb;
 wire [10:0] ps2_key;
 
@@ -393,7 +396,10 @@ hps_io #(.CONF_STR(CONF_STR), .VDNUM(3), .BLKSZ(1)) hps_io
 	.img_size(img_size),
 
 	.joystick_0(joya),
-	.joystick_1(joyb)
+	.joystick_1(joyb),
+	
+	.paddle_0(pd1),
+	.paddle_1(pd2)
 );
 
 /////////////////  RESET  /////////////////////////
@@ -618,8 +624,10 @@ VIC20 VIC20
 	.clk_i(c1541_iec_clk_o & ext_iec_clk),
 	.data_i(c1541_iec_data_o & ext_iec_data),
 
-	.i_joy(~{joy[0],joy[1],joy[2],joy[3]}),
+	.i_joy(~{joy[0] | (status[30] ? joya[5] : joyb[5]),joy[1] | (status[30] ? joyb[5] : joya[5]),joy[2],joy[3]}),
 	.i_fire(~joy[4]),
+	.i_potx(~(status[30] ? pd2 : pd1)),
+	.i_poty(~(status[30] ? pd1 : pd2)),
 
 	.i_ram_ext_ro(mc_loaded ? 5'b00000 : (cart_blk & ~{5{status[11]}})),
 	.i_ram_ext   (mc_loaded ? 5'b11111 : (extram|cart_blk)),

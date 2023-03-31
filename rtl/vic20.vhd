@@ -68,6 +68,9 @@ entity VIC20 is
 		--
 		i_joy        : in  std_logic_vector(3 downto 0); -- 0 up, 1 down, 2 left,  3 right
 		i_fire       : in  std_logic;                    -- all low active
+		i_potx       : in  std_logic_vector(7 downto 0);
+		i_poty       : in  std_logic_vector(7 downto 0);
+
 		--
 		i_ram_ext_ro : in  std_logic_vector(4 downto 0); -- read-only region if set
 		i_ram_ext    : in  std_logic_vector(4 downto 0); -- at $A000(8k),$6000(8k),$4000(8k),$2000(8k),$0400(3k)
@@ -360,8 +363,8 @@ begin
 		I_WIDE          => i_wide,
       --
       I_LIGHT_PEN     => light_pen,
-      I_POTX          => '0',
-      I_POTY          => '0'
+      I_POTX          => i_potx,
+      I_POTY          => i_poty
       );
 
   via1: entity work.via6522

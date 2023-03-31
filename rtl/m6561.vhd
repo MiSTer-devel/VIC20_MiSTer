@@ -99,8 +99,8 @@ entity M6561 is
 		I_WIDE            : in    std_logic;
 		--
 		I_LIGHT_PEN       : in    std_logic;
-		I_POTX            : in    std_logic;
-		I_POTY            : in    std_logic
+		I_POTX            : in    std_logic_vector( 7 downto 0);
+		I_POTY            : in    std_logic_vector( 7 downto 0)
 	);
 end entity M6561;
 
@@ -449,8 +449,8 @@ begin
 
           when x"6" => O_DATA(7 downto 0)     <= r_x_lightpen;
           when x"7" => O_DATA(7 downto 0)     <= r_y_lightpen;
-          when x"8" => O_DATA(7 downto 0)     <= x"00"; -- pot x
-          when x"9" => O_DATA(7 downto 0)     <= x"00"; -- pot y
+          when x"8" => O_DATA(7 downto 0)     <= i_potx;
+          when x"9" => O_DATA(7 downto 0)     <= i_poty;
 
           when x"A" => O_DATA(7)              <= r_bass_enabled; 
                        O_DATA(6 downto 0)     <= r_bass_freq;
