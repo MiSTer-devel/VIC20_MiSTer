@@ -485,7 +485,7 @@ end
 reg rom_std;
 always @(posedge clk_sys) if(reset) rom_std <= status[15];
 
-VIC20 VIC20
+vic20_core VIC20
 (
 	.i_sysclk(clk_sys),
 	.i_sysclk_en(v20_en),
