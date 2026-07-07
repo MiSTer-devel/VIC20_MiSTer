@@ -74,19 +74,31 @@ wire        cpu_so_n = byte_n | ~soe;
 
 T65 cpu
 (
-	.mode(2'b00),
-	.res_n(~reset),
-	.enable(ph2_f),
-	.clk(clk),
-	.rdy(1'b1),
-	.abort_n(1'b1),
-	.irq_n(cpu_irq_n),
-	.nmi_n(1'b1),
-	.so_n(cpu_so_n),
-	.r_w_n(cpu_rw),
+	.Mode(2'b00),
+	.BCD_en(1'b1),
+	.Res_n(~reset),
+	.Enable(ph2_f),
+	.Clk(clk),
+	.Rdy(1'b1),
+	.Abort_n(1'b1),
+	.IRQ_n(cpu_irq_n),
+	.NMI_n(1'b1),
+	.SO_n(cpu_so_n),
+	.R_W_n(cpu_rw),
+	.Sync(),
+	.EF(),
+	.MF(),
+	.XF(),
+	.ML_n(),
+	.VP_n(),
+	.VDA(),
+	.VPA(),
 	.A(cpu_a),
 	.DI(cpu_di),
-	.DO(cpu_do)
+	.DO(cpu_do),
+	.Regs(),
+	.DEBUG(),
+	.NMI_ack()
 );
 
 wire extram_cs = ext_en && (cpu_a[15:13] == 'b100);

@@ -88,15 +88,31 @@ wire        cpu_rw;
 
 T65 cpu
 (
-	.clk(clk),
-	.enable(ph2_r),
-	.mode(2'b00),
-	.res_n(~reset),
-	.irq_n(cia_irq_n & ~via_irq),
-	.r_w_n(cpu_rw),
+	.Mode(2'b00),
+	.BCD_en(1'b1),
+	.Res_n(~reset),
+	.Enable(ph2_r),
+	.Clk(clk),
+	.Rdy(1'b1),
+	.Abort_n(1'b1),
+	.IRQ_n(cia_irq_n & ~via_irq),
+	.NMI_n(1'b1),
+	.SO_n(1'b1),
+	.R_W_n(cpu_rw),
+	.Sync(),
+	.EF(),
+	.MF(),
+	.XF(),
+	.ML_n(),
+	.VP_n(),
+	.VDA(),
+	.VPA(),
 	.A(cpu_a),
 	.DI(cpu_di),
-	.DO(cpu_do)
+	.DO(cpu_do),
+	.Regs(),
+	.DEBUG(),
+	.NMI_ack()
 );
 
 wire [7:0] ram_do;
